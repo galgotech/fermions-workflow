@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -148,7 +147,6 @@ func NewCentrifuge(busEvent bus.Bus) (*centrifuge.WebsocketHandler, error) {
 		UseWriteBufferPool: true,
 		ProtocolVersion:    centrifuge.ProtocolVersion2,
 		CheckOrigin: func(r *http.Request) bool {
-			fmt.Println(r.RequestURI)
 			return true
 		},
 	}), nil

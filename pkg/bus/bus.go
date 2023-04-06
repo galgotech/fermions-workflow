@@ -51,7 +51,7 @@ func (b *BusImpl) Init() (err error) {
 		return err
 	}
 
-	b.connector = connector
+	b.connector = NewBroadcast(connector)
 	return nil
 }
 

@@ -3,7 +3,6 @@ package state
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/serverlessworkflow/sdk-go/v2/model"
 
@@ -66,7 +65,6 @@ func (e *Event) Run(ctx context.Context, dataIn data.Data[any]) (data.Data[any],
 	}
 
 	dataOut := eventOut.Data
-	fmt.Println(dataOut)
 	return dataOut, nil
 }
 

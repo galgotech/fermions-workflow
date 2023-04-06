@@ -2,13 +2,11 @@ package bus
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/galgotech/fermions-workflow/pkg/concurrency"
 	"github.com/galgotech/fermions-workflow/pkg/log"
 )
 
@@ -19,26 +17,18 @@ func NewRedis(log log.Logger, url string) (Connector, error) {
 	}
 	return &redisConnector{
 		log:       log,
-		ctx:       context.Background(),
-		subscribe: make(map[string]redisPubSup, 0),
+		subscribe: make(map[string]<-chan []byte),
 		rdb:       redis.NewClient(opt),
 	}, nil
 }
 
 var (
-	Pulse   time.Duration = 20 * time.Minute
-	Timeout               = 30 * time.Minute
+	Timeout = 30 * time.Minute
 )
-
-type redisPubSup struct {
-	pubSub *redis.PubSub
-	pulse  chan<- bool
-}
 
 type redisConnector struct {
 	subscribeLock sync.RWMutex
-	subscribe     map[string]redisPubSup
-	ctx           context.Context
+	subscribe     map[string]<-chan []byte
 
 	log log.Logger
 	rdb *redis.Client
@@ -49,83 +39,55 @@ func (r *redisConnector) Publish(ctx context.Context, name string, data []byte) 
 }
 
 func (r *redisConnector) Subscribe(ctx context.Context, channelName string) <-chan []byte {
-	subscribe := r.redisPubsub(channelName)
-	if subscribe.pubSub == nil {
-		subscribe = r.createRedisPubsub(channelName)
+	channel := r.redisPubsub(channelName)
+	if channel == nil {
+		channel = r.createRedisPubsub(channelName)
 	}
-
-	// pulse
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.Tick(Pulse):
-				subscribe.pulse <- true
-			}
-		}
-	}()
-
-	channel := make(chan []byte)
-	go func() {
-		defer close(channel)
-		for msg := range concurrency.OrDoneCtx(ctx, subscribe.pubSub.Channel()) {
-			r.log.Trace("receive message", "channel", msg.Channel, "payload", msg.Payload)
-			channel <- []byte(msg.Payload)
-		}
-	}()
 
 	return channel
 }
 
-func (r *redisConnector) redisPubsub(channelName string) redisPubSup {
+func (r *redisConnector) redisPubsub(channelName string) <-chan []byte {
 	r.subscribeLock.RLock()
 	defer r.subscribeLock.RUnlock()
 	if val, ok := r.subscribe[channelName]; ok {
 		return val
 	}
-	return redisPubSup{}
+	return nil
 }
 
-func (r *redisConnector) createRedisPubsub(channelName string) redisPubSup {
-	pubSub := r.rdb.Subscribe(r.ctx, channelName)
-	pulse := make(chan bool)
+func (r *redisConnector) createRedisPubsub(channelName string) <-chan []byte {
+	ctx := context.Background()
+	pubSub := r.rdb.Subscribe(ctx, channelName)
+
+	channel := make(chan []byte)
 	go func() {
+		defer func() {
+			close(channel)
+			err := pubSub.Unsubscribe(ctx, channelName)
+			if err != nil {
+				r.log.Error("redis unsubscribe", "channelName", channelName, "err", err.Error())
+			}
+		}()
+
 		for {
 			select {
-			case <-time.After(Timeout):
-				pubSub.Unsubscribe(r.ctx, channelName)
-				fmt.Println("unsubscribe")
-				return
-			case <-r.ctx.Done():
-				pubSub.Unsubscribe(r.ctx, channelName)
-				return
-			case <-pulse:
+			// case timeout: TODO: add timeout and healtbeart
+			case message := <-pubSub.Channel():
+				channel <- []byte(message.Payload)
 			}
 		}
 	}()
 
-	subscribe := redisPubSup{
-		pubSub: pubSub,
-		pulse:  pulse,
-	}
-
 	r.subscribeLock.Lock()
-	defer r.subscribeLock.Unlock()
-	r.subscribe[channelName] = subscribe
-	return subscribe
+	r.subscribe[channelName] = channel
+	r.subscribeLock.Unlock()
+
+	return channel
 }
 
-// func (r *redisConnector) redisSubscribe(ctx context.Context, channel chan<- []byte, channelsName ...string) {
-// 	pubsub := r.rdb.Subscribe(ctx, channelsName...)
-
-// 	go func() {
-// 		defer pubsub.Unsubscribe(ctx)
-// 		ch := pubsub.Channel()
-// 		for msg := range concurrency.OrDoneCtx(ctx, ch) {
-// 			r.log.Trace("receive message", "channel", msg.Channel, "payload", msg.Payload)
-// 			data := []byte(msg.Payload)
-// 			channel <- data
-// 		}
-// 	}()
-// }
+func (r *redisConnector) deleteRedisPubsub(channelName string) {
+	r.subscribeLock.Lock()
+	defer r.subscribeLock.Unlock()
+	delete(r.subscribe, channelName)
+}
