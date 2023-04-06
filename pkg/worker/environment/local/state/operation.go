@@ -1,0 +1,35 @@
+package state
+
+import (
+	"context"
+
+	"github.com/serverlessworkflow/sdk-go/v2/model"
+
+	"github.com/galgotech/fermions-workflow/pkg/worker/data"
+	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
+	"github.com/galgotech/fermions-workflow/pkg/worker/filter"
+)
+
+func newOperation(spec model.OperationState, baseState StateImpl, functions environment.MapFunctions) (*Operation, error) {
+	actions, err := newAction(spec.Actions, functions)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Operation{
+		StateImpl:  baseState,
+		actionsLen: len(actions),
+		actions:    actions,
+	}, nil
+}
+
+type Operation struct {
+	StateImpl
+	actionsLen int
+	actions    Actions
+	dataFilter filter.Filter
+}
+
+func (s *Operation) Run(ctx context.Context, dataIn data.Data[any]) (dataOut data.Data[any], err error) {
+	return s.actions.Run(dataIn)
+}

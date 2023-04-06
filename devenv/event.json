@@ -1,0 +1,41 @@
+{
+  "id": "event",
+  "version": "1.0.0",
+  "specVersion": "0.8",
+  "name": "Event Workflow",
+  "description": "Event Hello World",
+  "start": "Hello State",
+  "functions": [{
+    "name": "FunctionName",
+    "operation": "{key3: .key1}",
+    "type": "expression"
+  }],
+  "events": [{
+    "name": "EventName",
+    "type": "event-type",
+    "source": "event-source"
+ }],
+  "states":[
+    {
+      "name":"Hello State",
+      "type":"event",
+      "onEvents": [{
+        "eventRefs": ["EventName"],
+        "actions":[{
+          "functionRef": {
+            "refName": "FunctionName"
+          }
+        }]
+      }],
+      "transition": "Hello State Next"
+    },
+    {
+      "name": "Hello State Next",
+      "type": "inject",
+      "data": {
+         "result": "Hello World Next!"
+      },
+      "end": true
+   }
+  ]
+}
