@@ -16,7 +16,6 @@ import (
 func New() *Setting {
 	return &Setting{
 		log:           log.New("setting"),
-		ConfPath:      "conf/default.ini",
 		WorkflowSpecs: map[string]model.Workflow{},
 		Starts:        map[string]bool{},
 	}
@@ -25,15 +24,14 @@ func New() *Setting {
 type Setting struct {
 	Bus           Bus
 	log           log.Logger
-	ConfPath      string
 	WorkflowSpecs map[string]model.Workflow
 	Starts        map[string]bool
 }
 
-func (s *Setting) LoadConfig() error {
-	s.log.Info("load config", "path", s.ConfPath)
+func (s *Setting) LoadConfig(confPath string) error {
+	s.log.Info("load config", "path", confPath)
 
-	cfg, err := ini.Load(s.ConfPath)
+	cfg, err := ini.Load(confPath)
 	if err != nil {
 		return err
 	}

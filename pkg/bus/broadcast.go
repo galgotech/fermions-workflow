@@ -48,6 +48,7 @@ func (r *broadcastConnector) broadcast(ctx context.Context, channelName string) 
 			go func(msg []byte) {
 				r.channelsLock.RLock()
 				defer r.channelsLock.RUnlock()
+
 				for _, ch := range r.channels[channelName] {
 					go func(ch chan<- []byte) {
 						select {

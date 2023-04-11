@@ -6,21 +6,21 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/galgotech/fermions-workflow/pkg/setting"
-	"github.com/galgotech/fermions-workflow/pkg/standalone"
+	"github.com/galgotech/fermions-workflow/pkg/worker"
 )
 
-func Standalone() error {
+func Worker() error {
 	setting := setting.New()
 
 	app := &cli.App{
-		Name:    "fermions-workflow-standalone",
-		Usage:   "Fermions workflow runtime standalone",
+		Name:    "fermions-workflow-worker",
+		Usage:   "Workflow worker",
 		Authors: authors,
 		Flags:   globalFlags(setting, true, true),
 		Commands: []*cli.Command{
 			{
 				Name:  "run",
-				Usage: "Workflow standalone",
+				Usage: "",
 				Flags: []cli.Flag{
 					&cli.StringSliceFlag{
 						Name:     "exec",
@@ -33,11 +33,11 @@ func Standalone() error {
 					},
 				},
 				Action: func(c *cli.Context) error {
-					fermionsStandalone, err := standalone.Initialize(setting)
+					fermionsWorker, err := worker.Initialize(setting)
 					if err != nil {
 						return err
 					}
-					return fermionsStandalone.Execute()
+					return fermionsWorker.Execute()
 				},
 			},
 		},

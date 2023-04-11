@@ -10,13 +10,13 @@ import (
 	"github.com/galgotech/fermions-workflow/pkg/log"
 )
 
-func NewRedis(log log.Logger, url string) (Connector, error) {
+func NewRedis(url string) (Connector, error) {
 	opt, err := redis.ParseURL(url)
 	if err != nil {
 		return nil, err
 	}
 	return &redisConnector{
-		log:       log,
+		log:       log.New("bus-redis"),
 		subscribe: make(map[string]<-chan []byte),
 		rdb:       redis.NewClient(opt),
 	}, nil

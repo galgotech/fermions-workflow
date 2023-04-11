@@ -16,7 +16,6 @@ type Connector interface {
 }
 
 type Bus interface {
-	Init() (err error)
 	Publish(ctx context.Context, event cloudevents.Event)
 	Subscribes(ctx context.Context, channelName string) <-chan BusEvent
 }
@@ -29,6 +28,11 @@ func Provide(setting *setting.Setting) (Bus, error) {
 		setting: setting,
 	}
 
+	err := bus.init()
+	if err != nil {
+		return nil, err
+	}
+
 	return bus, nil
 }
 
@@ -39,16 +43,21 @@ type BusImpl struct {
 	initialized bool
 }
 
-func (b *BusImpl) Init() (err error) {
+func (b *BusImpl) init() (err error) {
 	if b.initialized {
 		return nil
 	}
 	b.initialized = true
 
-	b.log.Debug("redis url", "url", b.setting.Bus.Redis)
-	connector, err := NewRedis(b.log, b.setting.Bus.Redis)
-	if err != nil {
-		return err
+	var connector Connector
+	if b.setting.Bus.Redis != "" {
+		b.log.Debug("redis url", "url", b.setting.Bus.Redis)
+		connector, err = NewRedis(b.setting.Bus.Redis)
+		if err != nil {
+			return err
+		}
+	} else {
+		connector = NewChannel()
 	}
 
 	b.connector = NewBroadcast(connector)

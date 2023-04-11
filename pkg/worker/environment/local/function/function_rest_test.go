@@ -58,7 +58,7 @@ func TestRest(t *testing.T) {
 		}
 
 		err := functionRest.Init()
-		assert.ErrorIs(t, ErrorOperationNotFound, err)
+		assert.Error(t, err)
 	})
 
 	t.Run("init operation", func(t *testing.T) {
@@ -78,7 +78,7 @@ func TestRest(t *testing.T) {
 		}
 
 		_, err := functionRest.Run(data.Data[any]{})
-		assert.ErrorIs(t, ErrorOperationNotInitialize, err)
+		assert.Error(t, err)
 	})
 
 	t.Run("run", func(t *testing.T) {

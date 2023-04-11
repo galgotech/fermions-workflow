@@ -15,9 +15,6 @@ import (
 	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 )
 
-var ErrorOperationNotFound = errors.New("operation not found")
-var ErrorOperationNotInitialize = errors.New("operation not initialize")
-
 func newRest(operation string) *FunctionRest {
 	return &FunctionRest{
 		Http:      &http.Client{Timeout: time.Duration(1) * time.Second},
@@ -47,7 +44,7 @@ func (w *FunctionRest) Init() error {
 	var ok bool
 	w.method, w.url, w.op, ok = document.Analyzer.OperationForName(operationParse.Fragment)
 	if !ok {
-		return ErrorOperationNotFound
+		return errors.New("operation not found")
 	}
 
 	w.url = fmt.Sprintf("%s%s%s", document.Host(), document.BasePath(), w.url)
@@ -57,7 +54,7 @@ func (w *FunctionRest) Init() error {
 
 func (w *FunctionRest) Run(dataInput data.Data[any]) (data.Data[any], error) {
 	if w.method == "" || w.url == "" || w.op == nil {
-		return nil, ErrorOperationNotInitialize
+		return nil, errors.New("operation not initialize")
 	}
 
 	req, err := http.NewRequest(w.method, w.url, nil)

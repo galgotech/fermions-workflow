@@ -34,16 +34,6 @@ type Worker struct {
 }
 
 func (w *Worker) Execute() error {
-	err := w.setting.LoadConfig()
-	if err != nil {
-		return err
-	}
-
-	err = w.busEvent.Init()
-	if err != nil {
-		return err
-	}
-
 	for workFlowKey, start := range w.setting.Starts {
 		if start {
 			if spec, ok := w.setting.WorkflowSpecs[workFlowKey]; ok {
