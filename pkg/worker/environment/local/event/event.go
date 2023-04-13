@@ -32,7 +32,7 @@ func (e *Event) Consume(ctx context.Context) (cloudevents.Event, error) {
 	}
 
 	e.log.Debug("consume", "source", e.spec.Source, "name", e.spec.Name, "type", e.spec.Type)
-	event := <-e.busEvent.Subscribes(ctx, e.spec.Source)
+	event := <-e.busEvent.Subscribe(ctx, e.spec.Source)
 	if event.Err != nil {
 		return cloudevents.NewEvent(), event.Err
 	}

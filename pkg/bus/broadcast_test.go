@@ -36,27 +36,42 @@ func TestBroadcast(t *testing.T) {
 }
 
 func TestBroadcastCancel(t *testing.T) {
-	wg := sync.WaitGroup{}
-	ctx, ctxCancel := context.WithCancel(context.Background())
+	wg1 := sync.WaitGroup{}
+	wg2 := sync.WaitGroup{}
+	wg3 := sync.WaitGroup{}
+	ctx1, ctxCancel1 := context.WithCancel(context.Background())
+	ctx2, ctxCancel2 := context.WithCancel(context.Background())
+	ctx3 := context.Background()
 	connector := &stubConnector{
 		channel: make(chan []byte),
 	}
 	broadcast := NewBroadcast(connector)
 
+	wg1.Add(1)
 	go func() {
-		wg.Add(1)
-		ch := <-broadcast.Subscribe(ctx, "test")
+		ch := <-broadcast.Subscribe(ctx1, "test")
 		assert.Nil(t, ch)
-		wg.Done()
+		wg1.Done()
 	}()
 
+	wg2.Add(1)
+	wg3.Add(1)
 	go func() {
-		wg.Add(1)
-		ch := <-broadcast.Subscribe(ctx, "test")
-		assert.Nil(t, ch)
-		wg.Done()
+		ch := broadcast.Subscribe(ctx2, "test")
+		assert.Equal(t, []byte("test"), <-ch)
+		wg2.Done()
+
+		assert.Nil(t, <-ch)
+		wg3.Done()
 	}()
 
-	ctxCancel()
-	wg.Wait()
+	ctxCancel1()
+	wg1.Wait()
+
+	err := broadcast.Publish(ctx3, "test", []byte("test"))
+	assert.NoError(t, err)
+	wg2.Wait()
+
+	ctxCancel2()
+	wg3.Wait()
 }

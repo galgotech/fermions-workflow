@@ -17,7 +17,7 @@ type Connector interface {
 
 type Bus interface {
 	Publish(ctx context.Context, event cloudevents.Event)
-	Subscribes(ctx context.Context, channelName string) <-chan BusEvent
+	Subscribe(ctx context.Context, channelName string) <-chan BusEvent
 }
 
 func Provide(setting *setting.Setting) (Bus, error) {
@@ -76,7 +76,7 @@ func (b *BusImpl) Publish(ctx context.Context, event cloudevents.Event) {
 	}
 }
 
-func (b *BusImpl) Subscribes(ctx context.Context, channel string) <-chan BusEvent {
+func (b *BusImpl) Subscribe(ctx context.Context, channel string) <-chan BusEvent {
 	receive := b.connector.Subscribe(ctx, channel)
 	subscribe := make(chan BusEvent)
 	go func() {

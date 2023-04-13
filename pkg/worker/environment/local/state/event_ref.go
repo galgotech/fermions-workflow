@@ -38,9 +38,26 @@ func (e *EventRef) Run(ctx context.Context, dataIn data.Data[any]) (data.Data[an
 		return nil, err
 	}
 
+	dataIn, err = e.consumeEvents(ctx, dataIn)
+	if err != nil {
+		return nil, err
+	}
+
+	dataOut, err := e.actions.Run(dataIn)
+	if err != nil {
+		return nil, err
+	}
+
+	return dataOut, err
+}
+
+func (e *EventRef) consumeEvents(ctx context.Context, dataIn data.Data[any]) (data.Data[any], error) {
+	ctxSubscribe, cancelSubscribe := context.WithCancel(ctx)
+	defer cancelSubscribe()
+
 	eventRefs := make([]<-chan eventRefOut, len(e.events))
 	for i, event := range e.events {
-		eventRefs[i] = e.runEventRef(ctx, event)
+		eventRefs[i] = e.runEventRef(ctxSubscribe, event)
 	}
 
 	if e.exclusive {
@@ -60,12 +77,7 @@ func (e *EventRef) Run(ctx context.Context, dataIn data.Data[any]) (data.Data[an
 		}
 	}
 
-	dataOut, err := e.actions.Run(dataIn)
-	if err != nil {
-		return nil, err
-	}
-
-	return dataOut, err
+	return dataIn, nil
 }
 
 func (e *EventRef) runEventRef(ctx context.Context, event environment.Event) <-chan eventRefOut {

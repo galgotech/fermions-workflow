@@ -85,7 +85,7 @@ func NewCentrifuge(busEvent bus.Bus) (*centrifuge.WebsocketHandler, error) {
 			loggerCF.Info("user subscribes", "userID", client.UserID(), "channel", e.Channel)
 
 			go func() {
-				subscribeChan := busEvent.Subscribes(ctx, e.Channel)
+				subscribeChan := busEvent.Subscribe(ctx, e.Channel)
 				for subscribe := range concurrency.OrDoneCtx(ctx, subscribeChan) {
 					if subscribe.Err != nil {
 						loggerCF.Debug("error subscribe", "error", err)
@@ -115,6 +115,11 @@ func NewCentrifuge(busEvent bus.Bus) (*centrifuge.WebsocketHandler, error) {
 		})
 
 		client.OnPublish(func(e centrifuge.PublishEvent, cb centrifuge.PublishCallback) {
+			if e.Channel != "fermions-worklow-ui" {
+				loggerCF.Warn("publish received invalid channel", "userID", client.UserID(), "channel", e.Channel)
+				cb(centrifuge.PublishReply{}, centrifuge.ErrorBadRequest)
+				return
+			}
 			loggerCF.Info("user publishes into channel", "userID", client.UserID(), "channel", e.Channel)
 
 			event := cloudevents.NewEvent()

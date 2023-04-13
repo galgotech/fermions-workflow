@@ -25,7 +25,7 @@ type channelConnector struct {
 func (r *channelConnector) Publish(ctx context.Context, channelName string, data []byte) error {
 	channel := r.channelPubsub(channelName)
 	if channel == nil {
-		channel = r.createChannelPubsub(channelName)
+		return nil
 	}
 
 	go func() {
@@ -33,7 +33,6 @@ func (r *channelConnector) Publish(ctx context.Context, channelName string, data
 		case <-time.After(Timeout):
 		case channel <- data:
 		}
-
 	}()
 	return nil
 }

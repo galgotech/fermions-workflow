@@ -9,7 +9,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func TestSubscribes(t *testing.T) {
+func TestSubscribe(t *testing.T) {
 	connector := &stubConnector{
 		channel: make(chan []byte),
 	}
@@ -27,7 +27,7 @@ func TestSubscribes(t *testing.T) {
 	go func(t *testing.T) {
 		defer wg.Done()
 		ctx := context.Background()
-		subscribe := b.Subscribes(ctx, "test")
+		subscribe := b.Subscribe(ctx, "test")
 		event := <-subscribe
 		assert.NoError(t, event.Err)
 
