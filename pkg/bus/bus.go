@@ -2,6 +2,7 @@ package bus
 
 import (
 	"context"
+	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 
@@ -39,7 +40,7 @@ func Provide(setting *setting.Setting) (Bus, error) {
 type BusImpl struct {
 	setting     *setting.Setting
 	log         log.Logger
-	connector   Connector
+	connector   *broadcastConnector
 	initialized bool
 }
 
@@ -81,7 +82,7 @@ func (b *BusImpl) Subscribe(ctx context.Context, channel string) <-chan BusEvent
 	subscribe := make(chan BusEvent)
 	go func() {
 		defer close(subscribe)
-		for data := range concurrency.OrDoneCtx(ctx, receive) {
+		for data := range concurrency.OrDoneCtx(ctx, receive.Channel()) {
 			busEvent := BusEvent{
 				Raw: data,
 			}
@@ -103,4 +104,49 @@ type BusEvent struct {
 	Event cloudevents.Event
 	Raw   []byte
 	Err   error
+}
+
+type startGoroutineFn func(done <-chan interface{}, puselInterval time.Duration) (heartbeat <-chan interface{})
+
+func newSteward(timeout time.Duration, startGoroutine startGoroutineFn) startGoroutineFn {
+	return func(done <-chan interface{}, puselInterval time.Duration) <-chan interface{} {
+		heartbeat := make(chan interface{})
+		go func() {
+			defer close(heartbeat)
+
+			var wardDone chan interface{}
+			var wardHeartbeat <-chan interface{}
+			startWard := func() {
+				wardDone = make(chan interface{})
+				wardHeartbeat = startGoroutine(concurrency.Or(wardDone, wardHeartbeat), timeout/2)
+			}
+			startWard()
+			pulse := time.Tick(puselInterval)
+
+		monitorLoop:
+			for {
+				timeoutSignal := time.After(timeout)
+
+				for {
+					select {
+					case <-pulse:
+						select {
+						case heartbeat <- struct{}{}:
+						default:
+						}
+					case <-wardHeartbeat:
+						continue monitorLoop
+					case <-timeoutSignal:
+						close(wardDone)
+						startWard()
+						continue monitorLoop
+					case <-done:
+						return
+					}
+				}
+			}
+		}()
+
+		return heartbeat
+	}
 }

@@ -7,6 +7,8 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
+
+	"github.com/galgotech/fermions-workflow/pkg/log"
 )
 
 func TestSubscribe(t *testing.T) {
@@ -14,7 +16,7 @@ func TestSubscribe(t *testing.T) {
 		channel: make(chan []byte),
 	}
 	b := BusImpl{
-		connector: connector,
+		connector: NewBroadcast(connector),
 	}
 
 	event := cloudevents.NewEvent()
@@ -47,13 +49,16 @@ func TestSubscribe(t *testing.T) {
 
 type stubConnector struct {
 	Connector
+	log            log.Logger
 	PublishCount   int
 	SubscribeCount int
 
 	channel chan []byte
 }
 
-func (c *stubConnector) Publish(ctx context.Context, name string, data []byte) error {
+func (c *stubConnector) Publish(ctx context.Context, channelName string, data []byte) error {
+	c.log.Debug("publish", "channelName", channelName)
+
 	c.PublishCount++
 	c.channel <- data
 	return nil

@@ -30,7 +30,8 @@ func (r *channelConnector) Publish(ctx context.Context, channelName string, data
 
 	go func() {
 		select {
-		case <-time.After(Timeout):
+		case <-time.After(1 * time.Second):
+		case <-ctx.Done():
 		case channel <- data:
 		}
 	}()
@@ -38,12 +39,11 @@ func (r *channelConnector) Publish(ctx context.Context, channelName string, data
 }
 
 func (r *channelConnector) Subscribe(ctx context.Context, channelName string) <-chan []byte {
-	channel := r.channelPubsub(channelName)
-	if channel == nil {
-		channel = r.createChannelPubsub(channelName)
+	ch := r.channelPubsub(channelName)
+	if ch == nil {
+		ch = r.createChannelPubsub(ctx, channelName)
 	}
-
-	return channel
+	return ch
 }
 
 func (r *channelConnector) channelPubsub(channelName string) chan []byte {
@@ -55,25 +55,18 @@ func (r *channelConnector) channelPubsub(channelName string) chan []byte {
 	return nil
 }
 
-func (r *channelConnector) createChannelPubsub(channelName string) chan []byte {
+func (r *channelConnector) createChannelPubsub(ctx context.Context, channelName string) chan []byte {
 	r.channelsLock.Lock()
-	channel, ok := r.channels[channelName]
-	if !ok {
-		r.channels[channelName] = make(chan []byte)
-	}
-	channel = r.channels[channelName]
-	r.channelsLock.Unlock()
+	defer r.channelsLock.Unlock()
+
+	channel := make(chan []byte)
+	r.channels[channelName] = channel
 
 	go func() {
-		// defer func() {
-		// 	close(channel)
-		// 	r.deleteChannelPubsub(channelName)
-		// }()
-
-		// for {
-		// 	select {
-		// 	// case timeout: TODO: add timeout and healtbeart
-		// }
+		select {
+		case <-ctx.Done():
+			r.deleteChannelPubsub(channelName)
+		}
 	}()
 
 	return channel
@@ -82,5 +75,6 @@ func (r *channelConnector) createChannelPubsub(channelName string) chan []byte {
 func (r *channelConnector) deleteChannelPubsub(channelName string) {
 	r.channelsLock.Lock()
 	defer r.channelsLock.Unlock()
+	close(r.channels[channelName])
 	delete(r.channels, channelName)
 }

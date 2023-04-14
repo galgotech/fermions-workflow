@@ -17,10 +17,6 @@ type busStub struct {
 	ch map[string]chan bus.BusEvent
 }
 
-func (b *busStub) Init() error {
-	return nil
-}
-
 func (b *busStub) Subscribe(ctx context.Context, channelName string) <-chan bus.BusEvent {
 	ch := make(chan bus.BusEvent)
 	go func() {

@@ -9,12 +9,20 @@ import (
 	"github.com/galgotech/fermions-workflow/pkg/log"
 )
 
-func NewBroadcast(connector Connector) Connector {
-	return &broadcastConnector{
-		log:       log.New("test"),
-		connector: connector,
-		channels:  make(map[string][]chan<- []byte),
+var initialized = false
+
+func NewBroadcast(connector Connector) *broadcastConnector {
+	if initialized {
+		panic("double new")
 	}
+	initialized = true
+
+	broadcast := &broadcastConnector{
+		log:       log.New("bus-broadcast"),
+		connector: connector,
+		channels:  make(map[string][]*Subscribe),
+	}
+	return broadcast
 }
 
 type broadcastConnector struct {
@@ -22,20 +30,21 @@ type broadcastConnector struct {
 	connector Connector
 
 	channelsLock sync.RWMutex
-	channels     map[string][]chan<- []byte
+	channels     map[string][]*Subscribe
 }
 
-func (r *broadcastConnector) Publish(ctx context.Context, name string, data []byte) error {
-	return r.connector.Publish(ctx, name, data)
+func (r *broadcastConnector) Publish(ctx context.Context, channelName string, data []byte) error {
+	r.log.Debug("publish", "channelName", channelName)
+	return r.connector.Publish(ctx, channelName, data)
 }
 
-func (r *broadcastConnector) Subscribe(ctx context.Context, channelName string) <-chan []byte {
-	r.broadcast(channelName)
-	channel := r.addChannel(ctx, channelName)
-	return channel
+func (r *broadcastConnector) Subscribe(ctx context.Context, channelName string) *Subscribe {
+	r.log.Debug("subscribe", "channelName", channelName)
+	r.broadcast(ctx, channelName)
+	return r.create(ctx, channelName)
 }
 
-func (r *broadcastConnector) broadcast(channelName string) {
+func (r *broadcastConnector) broadcast(ctx context.Context, channelName string) {
 	r.channelsLock.RLock()
 	defer r.channelsLock.RUnlock()
 	if _, ok := r.channels[channelName]; ok {
@@ -43,67 +52,106 @@ func (r *broadcastConnector) broadcast(channelName string) {
 	}
 
 	go func() {
-		// TODO: Add a health to check needed keep the channelName
-		ctx := context.Background()
-		srcChannel := r.connector.Subscribe(ctx, channelName)
-		for msg := range concurrency.OrDoneCtx(ctx, srcChannel) {
+		ctx, ctxCancel := context.WithCancel(context.Background())
+		go func() {
+			// Garbage collector of source channels
+			// TODO: check to add helaty check, keeping that channel
+			select {
+			case <-time.After(5 * time.Minute):
+				r.log.Debug("broadcast gargabe collector", "channelName", channelName)
+
+				r.channelsLock.RLock()
+				l := len(r.channels[channelName])
+				if l == 0 {
+					ctxCancel()
+				}
+				r.channelsLock.RUnlock()
+			}
+		}()
+
+		subscribe := r.connector.Subscribe(ctx, channelName)
+		for msg := range concurrency.OrDoneCtx(ctx, subscribe) {
+			r.log.Debug("source message received", "channelName", channelName)
 			go func(msg []byte) {
 				r.channelsLock.RLock()
 				defer r.channelsLock.RUnlock()
 
-				for i, ch := range r.channels[channelName] {
-					r.log.Debug("broadcast", "i", i, "channelName", channelName)
-					go func(ch chan<- []byte) {
-						select {
-						case <-time.After(5 * time.Second): // TODO: validate that timeout
-						case ch <- msg:
+				for i, subscribe := range r.channels[channelName] {
+					r.log.Debug("broadcast to channel", "i", i, "channelName", channelName)
+
+					go func(subscribe *Subscribe, i int) {
+						// Check is closed
+						if subscribe.channel == nil {
+							r.log.Warn("brodcast channel closed", "index", i, "channel", channelName)
+							return
 						}
-					}(ch)
+						select {
+						case <-time.After(1 * time.Second):
+							r.log.Warn("brodcast channel timeout", "index", i, "channel", channelName)
+						case subscribe.channel <- msg:
+						}
+					}(subscribe, i)
 				}
 			}(msg)
 		}
+		r.log.Debug("broadcast finished", "channelName", channelName)
 	}()
 }
 
-func (r *broadcastConnector) addChannel(ctx context.Context, channelName string) chan []byte {
-	ch := make(chan []byte)
-
-	r.channelsLock.Lock()
-	r.channels[channelName] = append(r.channels[channelName], ch)
-	r.channelsLock.Unlock()
-
+func (r *broadcastConnector) create(ctx context.Context, channelName string) *Subscribe {
+	subscribe := &Subscribe{
+		log:      r.log,
+		name:     channelName,
+		channel:  make(chan []byte),
+		removeFn: r.remove,
+	}
 	go func() {
-		defer close(ch)
 		select {
 		case <-ctx.Done():
-			r.deleteChannel(channelName, ch)
-			r.log.Debug("broadcast delete/close channel")
+			r.log.Debug("channel context.done", "channelName", channelName)
+			subscribe.Unsubscribe()
 		}
 	}()
 
-	return ch
-}
-
-func (r *broadcastConnector) deleteChannel(channelName string, chDelete chan<- []byte) {
 	r.channelsLock.Lock()
 	defer r.channelsLock.Unlock()
-	index := -1
-	for i, ch := range r.channels[channelName] {
-		if chDelete == ch {
-			index = i
+	r.channels[channelName] = append(r.channels[channelName], subscribe)
+
+	return subscribe
+}
+
+func (r *broadcastConnector) remove(deleteSubscribe *Subscribe) {
+	channelName := deleteSubscribe.name
+
+	r.channelsLock.Lock()
+	defer r.channelsLock.Unlock()
+	for i, subscribe := range r.channels[channelName] {
+		if deleteSubscribe == subscribe {
+			r.log.Debug("close and remove channel from broadcast", "channelName", channelName, "index", i)
+
+			last_index := len(r.channels[channelName]) - 1
+			r.channels[channelName][i] = r.channels[channelName][last_index]
+			r.channels[channelName] = r.channels[channelName][:last_index]
+
+			close(deleteSubscribe.channel)
 			break
 		}
 	}
+}
 
-	if index == -1 {
-		panic("broadcast try remove a channel not found")
-	}
+type Subscribe struct {
+	log      log.Logger
+	name     string
+	channel  chan []byte
+	removeFn func(deleteSubscribe *Subscribe)
+}
 
-	r.log.Debug("remove channel from broadcast start ...", "channelName", channelName, "index", index, "len", len(r.channels[channelName]))
-	start := r.channels[channelName][:index]
-	end := r.channels[channelName][index+1:]
-	r.channels[channelName] = append([]chan<- []byte{}, start...)
-	r.channels[channelName] = append(r.channels[channelName], end...)
+func (s *Subscribe) Channel() <-chan []byte {
+	return s.channel
+}
 
-	r.log.Debug("remove channel from broadcast done.", "channelName", channelName, "index", index, "len", len(r.channels[channelName]))
+func (s *Subscribe) Unsubscribe() {
+	s.log.Debug("unsubscribe", "channelName", s.channel)
+
+	s.removeFn(s)
 }

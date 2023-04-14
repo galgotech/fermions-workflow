@@ -14,9 +14,9 @@ func TestChannel(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
+	ch := channel.Subscribe(ctx, "test")
 	go func() {
-		data := <-channel.Subscribe(ctx, "test")
-		assert.Equal(t, []byte("data test"), data)
+		assert.Equal(t, []byte("data test"), <-ch)
 		wg.Done()
 	}()
 
@@ -28,24 +28,23 @@ func TestChannel(t *testing.T) {
 
 func TestChannelWithBroadcast(t *testing.T) {
 	ctx := context.Background()
-	connector := NewChannel()
-	broadcast := NewBroadcast(connector)
+	broadcast := NewBroadcast(NewChannel())
 
 	var wg sync.WaitGroup
 	wg.Add(2)
+	ch1 := broadcast.Subscribe(ctx, "test").Channel()
+	ch2 := broadcast.Subscribe(ctx, "test").Channel()
+
 	go func() {
-		data := <-broadcast.Subscribe(ctx, "test")
-		assert.Equal(t, []byte("data test"), data)
+		assert.Equal(t, []byte("data test"), <-ch1)
+		wg.Done()
+	}()
+	go func() {
+		assert.Equal(t, []byte("data test"), <-ch2)
 		wg.Done()
 	}()
 
-	go func() {
-		data := <-broadcast.Subscribe(ctx, "test")
-		assert.Equal(t, []byte("data test"), data)
-		wg.Done()
-	}()
-
-	err := connector.Publish(ctx, "test", []byte("data test"))
+	err := broadcast.Publish(ctx, "test", []byte("data test"))
 	assert.NoError(t, err)
 
 	wg.Wait()
