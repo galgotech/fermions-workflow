@@ -10,7 +10,7 @@ import (
 )
 
 func Standalone() error {
-	setting := setting.New()
+	setting := setting.New().(*setting.FermionsSetting)
 
 	app := &cli.App{
 		Name:    "fermions-workflow-standalone",
@@ -25,7 +25,7 @@ func Standalone() error {
 					&cli.StringSliceFlag{
 						Name:     "exec",
 						Usage:    "exec workflow",
-						Required: true,
+						Required: false,
 						Action: func(c *cli.Context, exec []string) error {
 							setting.AddStart(exec)
 							return nil
@@ -37,7 +37,8 @@ func Standalone() error {
 					if err != nil {
 						return err
 					}
-					return fermionsStandalone.Execute()
+					fermionsStandalone.Execute()
+					return nil
 				},
 			},
 		},

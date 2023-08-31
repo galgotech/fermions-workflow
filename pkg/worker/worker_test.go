@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"context"
 	"testing"
 
 	"github.com/serverlessworkflow/sdk-go/v2/model"
@@ -26,10 +25,10 @@ func TestExecute(t *testing.T) {
 func setup(workflowSpec model.Workflow) (*Worker, *runtimeStub) {
 	busEvent := test.NewBusStub()
 	fr := &runtimeStub{}
-	setting := setting.New()
+	setting := setting.New().(*setting.FermionsSetting)
 	setting.AddWorkflow(workflowSpec)
 	setting.AddStart([]string{"test"})
-	worker := New(setting, fr, newEnvironment, busEvent)
+	worker, _ := New(setting, fr, newEnvironment, busEvent)
 
 	return worker, fr
 }
@@ -56,7 +55,7 @@ type runtimeStub struct {
 	Count int
 }
 
-func (s *runtimeStub) Start(ctx context.Context, env environment.Environment) error {
+func (s *runtimeStub) Start(env environment.Environment) error {
 	s.Env = env
 	s.Count++
 	return nil

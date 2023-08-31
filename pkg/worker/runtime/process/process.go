@@ -2,141 +2,165 @@ package process
 
 import (
 	"context"
-	"time"
+
+	"github.com/google/uuid"
+	"github.com/serverlessworkflow/sdk-go/v2/model"
 
 	"github.com/galgotech/fermions-workflow/pkg/bus"
-	"github.com/galgotech/fermions-workflow/pkg/concurrency"
 	"github.com/galgotech/fermions-workflow/pkg/log"
 	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
 )
 
+type ContextKey string
+
+const (
+	ContextKeyTrace ContextKey = "trace"
+)
+
 func Provide(dataManager data.Manager, workflowBus bus.Bus) *WorkflowRuntime {
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-
 	runtime := &WorkflowRuntime{
-		log:         log.New("worker-runtime-process"),
-		ctx:         ctx,
-		cancel:      cancel,
-		dataManager: dataManager,
-		bus:         workflowBus,
-		stateIn:     make(chan stateIn),
-	}
+		log: log.New("worker-runtime-process"),
 
-	runtime.init()
+		dataManager:      dataManager,
+		bus:              workflowBus,
+		workflowsRunning: make(map[uint64]*stateIn),
+	}
 
 	return runtime
-}
-
-func newStateIn(ctx context.Context, env environment.Environment, state environment.State) stateIn {
-	return stateIn{
-		ctx:   ctx,
-		env:   env,
-		state: state,
-	}
-}
-
-type stateIn struct {
-	ctx   context.Context
-	env   environment.Environment
-	state environment.State
 }
 
 type WorkflowRuntime struct {
 	log log.Logger
 
-	ctx         context.Context
-	cancel      context.CancelFunc
-	dataManager data.Manager
-	bus         bus.Bus
-
-	stateIn chan stateIn
+	dataManager      data.Manager
+	bus              bus.Bus
+	currentPid       uint64
+	workflowsRunning map[uint64]*stateIn
 }
 
-func (r *WorkflowRuntime) init() {
-	go func() {
-		for state := range concurrency.OrDoneCtx(r.ctx, r.stateIn) {
-			go func(state stateIn) {
-				r.state(state.ctx, state.env, state.state)
-			}(state)
-		}
-	}()
-}
-
-func (r *WorkflowRuntime) Shutdown() {
-	r.log.Info("shutdown")
-	close(r.stateIn)
-	r.cancel()
-}
-
-func (r *WorkflowRuntime) Start(ctx context.Context, env environment.Environment) error {
-
-	stateGenerator, err := env.Start()
+func (r *WorkflowRuntime) Start(env environment.Environment) error {
+	stateCtx, err := newStateIn(env)
 	if err != nil {
 		return err
 	}
 
-	stateIn := newStateIn(stateGenerator.Ctx(), env, env.State(stateGenerator.State()))
-	go func() {
-		select {
-		case <-time.After(5 * time.Second):
-			r.log.Error("start workflow timeout", "name", env.Spec().Name)
-		case r.stateIn <- stateIn:
-		}
-	}()
+	r.workflowsRunning[r.currentPid] = stateCtx
+	stateCtx.wid = r.currentPid
+	r.currentPid += 1
 
+	r.state(stateCtx)
 	return nil
 }
 
-func (r *WorkflowRuntime) state(ctx context.Context, env environment.Environment, state environment.State) {
+func (r *WorkflowRuntime) Shutdown() {
+	r.log.Info("shutdown")
+	for wid := range r.workflowsRunning {
+		r.Stop(wid)
+	}
+}
+
+func (r *WorkflowRuntime) Stop(wid uint64) {
+	r.log.Info("stop workflow", "wid", wid)
+	if execState, ok := r.workflowsRunning[wid]; ok {
+		// TODO: Check cancel is corret closing go routines
+		execState.cancel()
+		delete(r.workflowsRunning, wid)
+	}
+}
+
+func (r *WorkflowRuntime) WorkflowsRunning() bool {
+	// TODO: Check concurrency from workflowsRunning
+	return len(r.workflowsRunning) > 0
+}
+
+func (r *WorkflowRuntime) state(stateCtx *stateIn) {
 	go func() {
-		r.log.Info("state start", "name", env.Spec().Name, "type", state.Type(), "trace", ctx.Value("trace"))
+		ctx := stateCtx.ctx
+		env := stateCtx.env
+		state := stateCtx.env.State(stateCtx.state)
+
+		r.log.Info("state run", "workflow", env.Spec().Name, "state", stateCtx.state, "type", state.Type(), "trace", ctx.Value(ContextKeyTrace))
 
 		var dataIn data.Data[any]
 		var dataOut data.Data[any]
 
-		r.log.Debug("state filter input", "name", env.Spec().Name, "trace", ctx.Value("trace"))
+		r.log.Debug("state filter input", "workflow", env.Spec().Name, "state", stateCtx.state, "trace", ctx.Value(ContextKeyTrace))
 		dataIn, err := state.FilterInput(dataIn)
 		if err != nil {
-			r.log.Error("state error", "state", state.Name(), "err", err.Error(), "trace", ctx.Value("trace"))
+			r.log.Error("state error", "state", state.Name(), "err", err.Error(), "trace", ctx.Value(ContextKeyTrace))
 			return
 		}
 
-		r.log.Debug("state run", "name", env.Spec().Name, "trace", ctx.Value("trace"))
+		r.log.Debug("state run", "workflow", env.Spec().Name, "state", stateCtx.state, "trace", ctx.Value(ContextKeyTrace))
 		dataOut, err = state.Run(ctx, dataIn)
 		if err != nil {
-			r.log.Error("state error", "state", state.Name(), "err", err.Error(), "trace", ctx.Value("trace"))
+			r.log.Error("state error", "state", state.Name(), "err", err.Error(), "trace", ctx.Value(ContextKeyTrace))
 			return
 		}
 
-		r.log.Debug("state output", "name", env.Spec().Name, "trace", ctx.Value("trace"))
+		r.log.Debug("state output", "workflow", env.Spec().Name, "state", stateCtx.state, "trace", ctx.Value(ContextKeyTrace))
 		dataOut, err = state.FilterOutput(dataOut)
 		if err != nil {
-			r.log.Error("state error", "state", state.Name(), "err", err.Error(), "trace", ctx.Value("trace"))
+			r.log.Error("state error", "state", state.Name(), "err", err.Error(), "trace", ctx.Value(ContextKeyTrace))
 			return
 		}
 
-		r.log.Debug("state data save", "name", env.Spec().Name, "trace", ctx.Value("trace"))
+		r.log.Debug("state data save", "workflow", env.Spec().Name, "state", stateCtx.state, "trace", ctx.Value(ContextKeyTrace))
 		r.dataManager.SetState(state.Name(), dataOut)
 
-		r.log.Debug("state compensate by", "name", env.Spec().Name, "trace", ctx.Value("trace"))
+		r.log.Debug("state compensate by", "workflow", env.Spec().Name, "state", stateCtx.state, "trace", ctx.Value(ContextKeyTrace))
 		err = env.CompensateBy(state)
 		if err != nil {
-			r.log.Error("state error", "state", state.Name(), "err", err.Error(), "trace", ctx.Value("trace"))
+			r.log.Error("state error", "state", state.Name(), "err", err.Error(), "trace", ctx.Value(ContextKeyTrace))
 			return
 		}
 
-		r.log.Debug("state produce events", "name", env.Spec().Name, "trace", ctx.Value("trace"))
+		r.log.Debug("state produce events", "workflow", env.Spec().Name, "state", stateCtx.state, "trace", ctx.Value(ContextKeyTrace))
 		err = state.ProduceEvents(ctx, dataOut)
 		if err != nil {
-			r.log.Error("produce events", "state", state.Name(), "err", err.Error(), "trace", ctx.Value("trace"))
+			r.log.Error("produce events", "state", state.Name(), "err", err.Error(), "trace", ctx.Value(ContextKeyTrace))
 			return
 		}
 
-		for nextState := range concurrency.OrDoneCtx(ctx, state.Next(ctx)) {
-			r.log.Debug("state next", "currentState", state.Name(), "nextState", nextState.State(), "trace", ctx.Value("trace"))
-			r.stateIn <- newStateIn(nextState.Ctx(), env, env.State(nextState.State()))
+		// Start a new EventState to waiting a new workflow execution
+		if state.Type() == model.StateTypeEvent && env.Start() == stateCtx.state {
+			r.Start(env)
 		}
+
+		// Next state
+		stateName, ok := state.Next()
+		if !ok {
+			r.log.Debug("workflow done", "currentState", state.Name(), "trace", ctx.Value(ContextKeyTrace))
+			r.Stop(stateCtx.wid)
+			return
+		}
+		stateCtx.state = stateName
+		r.state(stateCtx)
 	}()
+}
+
+func newStateIn(env environment.Environment) (*stateIn, error) {
+	trace, err := uuid.NewRandom()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = context.WithValue(ctx, ContextKeyTrace, trace.String())
+	return &stateIn{
+		ctx:    ctx,
+		cancel: cancel,
+		env:    env,
+		state:  env.Start(),
+	}, nil
+}
+
+type stateIn struct {
+	wid    uint64
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	env   environment.Environment
+	state string
 }

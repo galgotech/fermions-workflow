@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
-	"github.com/google/uuid"
 	"github.com/serverlessworkflow/sdk-go/v2/model"
 
 	"github.com/galgotech/fermions-workflow/pkg/log"
@@ -18,10 +17,10 @@ func NewBase(spec model.State, mapEvents environment.MapEvents) (s StateImpl, er
 	s.log = log.New("base state")
 
 	produceEventSpec := []model.ProduceEvent{}
-	if spec.Transition != nil {
-		produceEventSpec = spec.Transition.ProduceEvents
-	} else if spec.End != nil {
-		produceEventSpec = spec.End.ProduceEvents
+	if spec.BaseState.Transition != nil {
+		produceEventSpec = spec.BaseState.Transition.ProduceEvents
+	} else if spec.BaseState.End != nil {
+		produceEventSpec = spec.BaseState.End.ProduceEvents
 	}
 
 	produceEvents := make([]*ProduceEventImp, len(produceEventSpec))
@@ -31,11 +30,14 @@ func NewBase(spec model.State, mapEvents environment.MapEvents) (s StateImpl, er
 		if spec.Data.StrVal != "" {
 			f, err = filter.NewFilter(spec.Data.StrVal)
 			if err != nil {
+				s.log.Error("fail load data 1", "data", spec.Data.StrVal)
 				return s, err
 			}
 		} else {
-			err := json.Unmarshal(spec.Data.RawValue, &eventData)
+			// err := json.Unmarshal(spec.Data.RawValue, &eventData)
+			err := json.Unmarshal([]byte("{}"), &eventData)
 			if err != nil {
+				s.log.Error("fail load data 2", "data", spec.Data)
 				return s, err
 			}
 		}
@@ -96,16 +98,8 @@ func (t *StateImpl) Name() string {
 	return t.spec.Name
 }
 
-func (t *StateImpl) isEnd() bool {
-	end := t.spec.End
-	if end == nil {
-		return false
-	}
-	return end.Terminate
-}
-
 func (t *StateImpl) Transition() string {
-	return t.spec.Transition.NextState
+	return t.spec.BaseState.Transition.NextState
 }
 
 func (t *StateImpl) FilterInput(data data.Data[any]) (data.Data[any], error) {
@@ -118,23 +112,24 @@ func (t *StateImpl) FilterOutput(data data.Data[any]) (data.Data[any], error) {
 
 func (t *StateImpl) ProduceEvents(ctx context.Context, dataIn data.Data[any]) error {
 	for _, produceEvent := range t.produceEvents {
-		dataOut, err := produceEvent.Data(dataIn)
-		if err != nil {
-			return err
-		}
+		// dataOut, err := produceEvent.Data(dataIn)
+		// if err != nil {
+		// 	return err
+		// }
 
 		// TODO: Create new event in data.Data[any]
 		event := cloudevents.NewEvent()
-		data, err := json.Marshal(dataOut)
-		if err != nil {
-			return err
-		}
-		err = event.UnmarshalJSON(data)
-		if err != nil {
-			return err
-		}
+		// data, err := json.Marshal(dataOut)
+		// if err != nil {
+		// 	t.log.Error("fail produce events", "dataOut", dataOut)
+		// 	return err
+		// }
+		// err = event.UnmarshalJSON(data)
+		// if err != nil {
+		// 	return err
+		// }
 
-		err = produceEvent.event.Produce(ctx, event)
+		err := produceEvent.event.Produce(ctx, event)
 		if err != nil {
 			return err
 		}
@@ -143,48 +138,10 @@ func (t *StateImpl) ProduceEvents(ctx context.Context, dataIn data.Data[any]) er
 	return nil
 }
 
-func (e *StateImpl) Next(ctx context.Context) <-chan environment.StateStart {
-	ch := make(chan environment.StateStart)
-	go func() {
-		defer close(ch)
-		if e.spec.End != nil && e.spec.End.Terminate {
-			e.log.Info("state end", "name", e.spec.Name, "trace", ctx.Value("trace"))
-			return
-		}
-
-		nextState := e.spec.Transition.NextState
-		e.log.Debug("generate state next", "currentState", e.spec.Name, "nextState", nextState, "trace", ctx.Value("trace"))
-		ch <- NewStateStartCtx(ctx, nextState)
-	}()
-
-	return ch
-}
-
-func NewStateStartCtx(ctx context.Context, state string) environment.StateStart {
-	return &stateStart{ctx, state}
-}
-
-func NewStateStart(state string) (environment.StateStart, error) {
-	trace, err := uuid.NewRandom()
-	if err != nil {
-		return nil, err
+func (e *StateImpl) Next() (string, bool) {
+	if e.spec.End != nil && e.spec.End.Terminate {
+		return "", false
 	}
 
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, "trace", trace.String())
-
-	return &stateStart{ctx, state}, nil
-}
-
-type stateStart struct {
-	ctx   context.Context
-	state string
-}
-
-func (g *stateStart) Ctx() context.Context {
-	return g.ctx
-}
-
-func (g *stateStart) State() string {
-	return g.state
+	return e.spec.BaseState.Transition.NextState, true
 }

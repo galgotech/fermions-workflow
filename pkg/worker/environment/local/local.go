@@ -12,13 +12,13 @@ import (
 	"github.com/galgotech/fermions-workflow/pkg/worker/environment/local/state"
 )
 
-func ProvideNew(setting *setting.Setting) environment.NewEnvironment {
+func ProvideNew(setting setting.Setting) environment.NewEnvironment {
 	return func() environment.Environment {
 		return Provide(setting)
 	}
 }
 
-func Provide(setting *setting.Setting) *Local {
+func Provide(setting setting.Setting) *Local {
 	return &Local{
 		log: log.New("worker-environment-local"),
 	}
@@ -40,16 +40,19 @@ func (l *Local) InitializeWorkflow(spec model.Workflow, busEvent bus.Bus) (err e
 	l.spec = spec
 	err = l.initalizeFunctions(spec.Functions)
 	if err != nil {
+		l.log.Error("environment local fail initialize functions")
 		return err
 	}
 
 	err = l.initalizeEvents(spec.Events, busEvent)
 	if err != nil {
+		l.log.Error("environment local fail initialize events")
 		return err
 	}
 
 	err = l.initializeStates(spec.States)
 	if err != nil {
+		l.log.Error("environment local fail initialize states")
 		return err
 	}
 
@@ -84,6 +87,7 @@ func (l *Local) initializeStates(statesSpec []model.State) error {
 	for _, stateSpec := range statesSpec {
 		t, err := state.New(stateSpec, l.functions, l.events)
 		if err != nil {
+			l.log.Error("environment local fail new state", "state", stateSpec.Name)
 			return err
 		}
 		stateMap[stateSpec.Name] = t
@@ -92,16 +96,12 @@ func (l *Local) initializeStates(statesSpec []model.State) error {
 	return nil
 }
 
-func (l *Local) Start() (environment.StateStart, error) {
-	return state.NewStateStart(l.spec.Start.StateName)
+func (l *Local) Start() string {
+	return l.spec.Start.StateName
 }
 
 func (l *Local) State(name string) environment.State {
-	s := l.states[name]
-	if s.Type() == model.StateTypeEvent {
-		s, _ = state.NewStateEventGenerator(s)
-	}
-	return s
+	return l.states[name]
 }
 
 func (l *Local) CompensateBy(current environment.State) error {

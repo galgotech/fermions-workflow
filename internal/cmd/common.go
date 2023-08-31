@@ -12,15 +12,14 @@ var authors = []*cli.Author{
 	},
 }
 
-func globalFlags(setting *setting.Setting, conf, workflow bool) []cli.Flag {
+func globalFlags(setting *setting.FermionsSetting, conf, workflow bool) []cli.Flag {
 	flags := []cli.Flag{}
 
 	if conf {
 		flags = append(flags, &cli.PathFlag{
-			Name:        "conf",
-			Usage:       "",
-			DefaultText: "conf/default.ini",
-			Required:    false,
+			Name:     "conf",
+			Usage:    "",
+			Required: false,
 			Action: func(c *cli.Context, path cli.Path) error {
 				return setting.LoadConfig(path)
 			},
@@ -31,7 +30,7 @@ func globalFlags(setting *setting.Setting, conf, workflow bool) []cli.Flag {
 		flags = append(flags, &cli.PathFlag{
 			Name:     "workflow",
 			Usage:    "Workflow path",
-			Required: true,
+			Required: false,
 			Action: func(c *cli.Context, path cli.Path) error {
 				return setting.ParseWorkflow(path)
 			},

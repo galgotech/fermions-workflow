@@ -1,11 +1,10 @@
 //go:build wireinject
 // +build wireinject
 
-package standalone
+package standalonewasm
 
 import (
 	"github.com/galgotech/fermions-workflow/pkg/bus"
-	"github.com/galgotech/fermions-workflow/pkg/server"
 	"github.com/galgotech/fermions-workflow/pkg/setting"
 	"github.com/galgotech/fermions-workflow/pkg/worker"
 	"github.com/galgotech/fermions-workflow/pkg/worker/data"
@@ -24,12 +23,11 @@ var wireBasicSet = wire.NewSet(
 	process.Provide,
 	bus.Provide,
 	worker.New,
-	server.New,
 	New,
 	wire.Bind(new(runtime.Runtime), new(*process.WorkflowRuntime)),
 )
 
-func Initialize(setting.Setting) (*Standalone, error) {
+func Initialize(setting.Setting) (*StandaloneWasm, error) {
 	wire.Build(wireBasicSet)
-	return &Standalone{}, nil
+	return &StandaloneWasm{}, nil
 }

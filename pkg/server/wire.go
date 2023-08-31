@@ -15,7 +15,7 @@ var wireBasicSet = wire.NewSet(
 	New,
 )
 
-func Initialize(setting *setting.Setting) (*Server, error) {
+func Initialize(setting.Setting) (*Server, error) {
 	wire.Build(wireBasicSet)
 	return &Server{}, nil
 }

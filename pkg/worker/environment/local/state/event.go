@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"errors"
 
 	"github.com/serverlessworkflow/sdk-go/v2/model"
 
@@ -48,8 +47,7 @@ func newEvent(spec model.EventState, stateBase StateImpl, functions environment.
 
 type Event struct {
 	StateImpl
-	eventsLen int
-	onEvents  []EventRef
+	onEvents []EventRef
 }
 
 func (e *Event) Run(ctx context.Context, dataIn data.Data[any]) (data.Data[any], error) {
@@ -86,40 +84,4 @@ type eventOut struct {
 	OnEvent EventRef
 	Data    data.Data[any]
 	Err     error
-}
-
-func NewStateEventGenerator(state environment.State) (environment.State, error) {
-	stateEvent, ok := state.(*Event)
-	if !ok {
-		return nil, errors.New("state is not a Event")
-	}
-
-	return &stateEventGenerator{
-		StateImpl: stateEvent.StateImpl,
-		Event:     *stateEvent,
-	}, nil
-}
-
-// When a workflow start is a StateEvent, keep waiting a event to start the workflow execution
-type stateEventGenerator struct {
-	StateImpl
-	Event
-}
-
-func (s *stateEventGenerator) Next(ctx context.Context) <-chan environment.StateStart {
-	ch := make(chan environment.StateStart)
-	go func() {
-		defer close(ch)
-		ch <- <-s.Event.Next(ctx)
-
-		stateStart, err := NewStateStart(s.spec.Name)
-		if err != nil {
-			s.log.Error("finished workflow not possive create the first state", "err", err.Error())
-			return
-		}
-		s.log.Debug("generate state start", "startState", s.spec.Name, "trace", stateStart.Ctx().Value("trace"))
-		ch <- stateStart
-	}()
-
-	return ch
 }

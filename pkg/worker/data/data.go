@@ -29,6 +29,10 @@ func (d *Data[T]) Unmarshal(data []byte) error {
 	return json.Unmarshal(data, d)
 }
 
+func (d *Data[T]) Marshal() ([]byte, error) {
+	return json.Marshal(d)
+}
+
 func (d *Data[T]) FromMap(m map[string]T) {
 	*d = Data[T](m)
 }

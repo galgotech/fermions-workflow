@@ -23,17 +23,17 @@ import (
 	"github.com/galgotech/fermions-workflow/pkg/setting"
 )
 
-func New(setting *setting.Setting, busEvent bus.Bus) *Server {
+func New(s setting.Setting, busEvent bus.Bus) (*Server, error) {
 	return &Server{
 		log:      log.New("server"),
-		setting:  setting,
+		setting:  s,
 		busEvent: busEvent,
-	}
+	}, nil
 }
 
 type Server struct {
 	log      log.Logger
-	setting  *setting.Setting
+	setting  setting.Setting
 	busEvent bus.Bus
 }
 

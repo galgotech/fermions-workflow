@@ -4,6 +4,8 @@
 package worker
 
 import (
+	"github.com/google/wire"
+
 	"github.com/galgotech/fermions-workflow/pkg/bus"
 	"github.com/galgotech/fermions-workflow/pkg/setting"
 	"github.com/galgotech/fermions-workflow/pkg/worker/data"
@@ -11,7 +13,6 @@ import (
 	"github.com/galgotech/fermions-workflow/pkg/worker/environment/local"
 	"github.com/galgotech/fermions-workflow/pkg/worker/runtime"
 	"github.com/galgotech/fermions-workflow/pkg/worker/runtime/process"
-	"github.com/google/wire"
 )
 
 var wireBasicSet = wire.NewSet(
@@ -25,7 +26,7 @@ var wireBasicSet = wire.NewSet(
 	wire.Bind(new(runtime.Runtime), new(*process.WorkflowRuntime)),
 )
 
-func Initialize(setting *setting.Setting) (*Worker, error) {
+func Initialize(setting.Setting) (*Worker, error) {
 	wire.Build(wireBasicSet)
 	return &Worker{}, nil
 }

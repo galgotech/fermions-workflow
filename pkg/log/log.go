@@ -1,7 +1,7 @@
 package log
 
 import (
-	"os"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -11,9 +11,18 @@ var (
 	root zerolog.Logger
 )
 
+type FmtOutput struct{}
+
+// Support webassembly
+func (f *FmtOutput) Write(p []byte) (n int, err error) {
+	fmt.Print(string(p))
+	return len(p), nil
+}
+
 func init() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
+	output := zerolog.ConsoleWriter{Out: &FmtOutput{}, NoColor: false, TimeFormat: time.RFC3339}
+	// output := zerolog.ConsoleWriter{Out: &FmtOutput{}, TimeFormat: time.RFC3339}
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	root = zerolog.New(output).With().Timestamp().Logger()
 }
@@ -68,6 +77,7 @@ func (log *Log) iterateLog(loggerLevel *zerolog.Event, msg string, args []interf
 			loggerLevel.Interface(args[i].(string), args[i+1])
 		}
 	}
+
 	loggerLevel.Msg(msg)
 }
 

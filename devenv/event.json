@@ -11,11 +11,17 @@
     "type": "expression"
   }],
   "events": [{
+    "kind": "consumed",
     "name": "EventName",
     "type": "event-type",
     "source": "event-source"
- }],
-  "states":[
+  }, {
+    "kind": "produced",
+    "name": "EventName2",
+    "type": "event-type2",
+    "source": "event-source2"
+  }],
+  "states": [
     {
       "name":"Hello State",
       "type":"event",
@@ -33,9 +39,14 @@
       "name": "Hello State Next",
       "type": "inject",
       "data": {
-         "result": "Hello World Next!"
+        "result": "Hello World Next!"
       },
-      "end": true
+      "end": {
+        "terminate": true,
+        "produceEvents": [{
+          "eventRef": "EventName2"
+        }]
+      }
     }
   ]
 }

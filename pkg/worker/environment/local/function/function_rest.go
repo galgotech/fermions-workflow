@@ -26,7 +26,7 @@ type FunctionRest struct {
 	Http      *http.Client
 	Operation string
 	method    string
-	url       string
+	url       *url.URL
 	op        *spec.Operation
 }
 
@@ -42,22 +42,41 @@ func (w *FunctionRest) Init() error {
 	}
 
 	var ok bool
-	w.method, w.url, w.op, ok = document.Analyzer.OperationForName(operationParse.Fragment)
+	method, uri, op, ok := document.Analyzer.OperationForName(operationParse.Fragment)
 	if !ok {
 		return errors.New("operation not found")
 	}
 
-	w.url = fmt.Sprintf("%s%s%s", document.Host(), document.BasePath(), w.url)
+	w.method = method
+	w.op = op
+	w.url, err = url.Parse(fmt.Sprintf("%s%s%s", document.Host(), document.BasePath(), uri))
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (w *FunctionRest) Run(dataInput data.Data[any]) (data.Data[any], error) {
-	if w.method == "" || w.url == "" || w.op == nil {
-		return nil, errors.New("operation not initialize")
+func (w *FunctionRest) Run(dataIn data.Data[any]) (data.Data[any], error) {
+	if w.method == "" || w.url == nil && w.op == nil {
+		return nil, errors.New("operation not initialized")
 	}
 
-	req, err := http.NewRequest(w.method, w.url, nil)
+	url := *w.url
+	for _, parameter := range w.op.Parameters {
+		value, ok := dataIn[parameter.Name].(string)
+		if !ok && parameter.Required {
+			return nil, fmt.Errorf("not found parameter %q", value)
+		}
+
+		if parameter.In == "query" {
+			url.Query().Add(parameter.Name, value)
+		} else if parameter.In == "path" {
+		} else if parameter.In == "body" && (w.method == "POST" || w.method == "PUT" || w.method == "PATCH") {
+		}
+	}
+
+	req, err := http.NewRequest(w.method, w.url.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -72,11 +91,11 @@ func (w *FunctionRest) Run(dataInput data.Data[any]) (data.Data[any], error) {
 		return nil, err
 	}
 
-	dataOutput := data.Data[any]{}
-	err = json.Unmarshal(bodyBytes, &dataOutput)
+	dataOut := data.Data[any]{}
+	err = json.Unmarshal(bodyBytes, &dataOut)
 	if err != nil {
 		return nil, err
 	}
 
-	return dataOutput, nil
+	return dataOut, nil
 }

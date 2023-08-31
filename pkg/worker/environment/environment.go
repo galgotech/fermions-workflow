@@ -19,7 +19,7 @@ type NewEnvironment func() Environment
 type Environment interface {
 	Spec() model.Workflow
 	InitializeWorkflow(spec model.Workflow, busEvent bus.Bus) error
-	Start() (StateStart, error)
+	Start() string
 	State(name string) State
 	CompensateBy(transition State) error
 }
@@ -42,10 +42,5 @@ type State interface {
 	FilterOutput(data.Data[any]) (data.Data[any], error)
 	Run(ctx context.Context, dataIn data.Data[any]) (data.Data[any], error)
 	ProduceEvents(ctx context.Context, data data.Data[any]) error
-	Next(ctx context.Context) <-chan StateStart
-}
-
-type StateStart interface {
-	Ctx() context.Context
-	State() string
+	Next() (string, bool)
 }

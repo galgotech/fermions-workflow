@@ -24,6 +24,11 @@ paths:
   /path-test:
     get:
       operationId: test
+      parameters:
+      - name: test
+        in: query
+        required: false
+        type: string
       responses:
         "200":
           description: "OK"
@@ -42,6 +47,7 @@ func TestRest(t *testing.T) {
 		case "/function.json":
 			rw.Write([]byte(specOpenAPI))
 		case "/v1/path-test":
+			fmt.Println("req", req.URL.Query().Get("name"))
 			rw.Write([]byte("{\"test\":\"test\"}"))
 		default:
 			t.Failed()

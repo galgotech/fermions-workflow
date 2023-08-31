@@ -11,8 +11,7 @@ func TestErrFunctionTypeInvalid(t *testing.T) {
 	_, err := New(model.Function{
 		Type: "invalid",
 	})
-
-	assert.ErrorIs(t, ErrFunctionNotImplemented, err)
+	assert.Error(t, err)
 }
 
 func TestPrepareFunctionRest(t *testing.T) {

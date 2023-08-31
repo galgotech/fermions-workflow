@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"github.com/centrifugal/centrifuge"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -14,11 +13,6 @@ import (
 )
 
 var loggerCF = log.New("live.centrifuge")
-
-type clientMessage struct {
-	Timestamp int64  `json:"timestamp"`
-	Input     string `json:"input"`
-}
 
 func handleLog(msg centrifuge.LogEntry) {
 	arr := make([]interface{}, 0)
@@ -55,9 +49,7 @@ func NewCentrifuge(busEvent bus.Bus) (*centrifuge.WebsocketHandler, error) {
 	}
 
 	// Override default broker which does not use HistoryMetaTTL.
-	broker, err := centrifuge.NewMemoryBroker(node, centrifuge.MemoryBrokerConfig{
-		HistoryMetaTTL: 120 * time.Second,
-	})
+	broker, err := centrifuge.NewMemoryBroker(node, centrifuge.MemoryBrokerConfig{})
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +142,6 @@ func NewCentrifuge(busEvent bus.Bus) (*centrifuge.WebsocketHandler, error) {
 	return centrifuge.NewWebsocketHandler(node, centrifuge.WebsocketConfig{
 		ReadBufferSize:     1024,
 		UseWriteBufferPool: true,
-		ProtocolVersion:    centrifuge.ProtocolVersion2,
 		CheckOrigin: func(r *http.Request) bool {
 			return true
 		},

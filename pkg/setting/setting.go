@@ -13,22 +13,40 @@ import (
 	"github.com/galgotech/fermions-workflow/pkg/log"
 )
 
-func New() *Setting {
-	return &Setting{
+func New() Setting {
+	return &FermionsSetting{
 		log:           log.New("setting"),
-		WorkflowSpecs: map[string]model.Workflow{},
-		Starts:        map[string]bool{},
+		workflowSpecs: map[string]model.Workflow{},
+		starts:        map[string]bool{},
 	}
 }
 
-type Setting struct {
-	Bus           Bus
-	log           log.Logger
-	WorkflowSpecs map[string]model.Workflow
-	Starts        map[string]bool
+type Setting interface {
+	Bus() Bus
+	WorkflowSpecs() map[string]model.Workflow
+	Starts() map[string]bool
 }
 
-func (s *Setting) LoadConfig(confPath string) error {
+type FermionsSetting struct {
+	bus           Bus
+	log           log.Logger
+	workflowSpecs map[string]model.Workflow
+	starts        map[string]bool
+}
+
+func (s *FermionsSetting) Bus() Bus {
+	return s.bus
+}
+
+func (s *FermionsSetting) WorkflowSpecs() map[string]model.Workflow {
+	return s.workflowSpecs
+}
+
+func (s *FermionsSetting) Starts() map[string]bool {
+	return s.starts
+}
+
+func (s *FermionsSetting) LoadConfig(confPath string) error {
 	s.log.Info("load config", "path", confPath)
 
 	cfg, err := ini.Load(confPath)
@@ -43,13 +61,13 @@ func (s *Setting) LoadConfig(confPath string) error {
 			return err
 		}
 
-		s.Bus.Redis = url.Value()
+		s.bus.Redis = url.Value()
 	}
 
 	return nil
 }
 
-func (s *Setting) ParseWorkflow(filePath string) error {
+func (s *FermionsSetting) ParseWorkflow(filePath string) error {
 	info, err := os.Stat(filePath)
 	if err != nil {
 		return err
@@ -79,7 +97,7 @@ func (s *Setting) ParseWorkflow(filePath string) error {
 	return nil
 }
 
-func (s *Setting) AddWorkflow(workflowSpec model.Workflow) {
+func (s *FermionsSetting) AddWorkflow(workflowSpec model.Workflow) {
 	workflowKey := ""
 	if workflowSpec.Key != "" {
 		workflowKey = workflowSpec.Key
@@ -89,14 +107,14 @@ func (s *Setting) AddWorkflow(workflowSpec model.Workflow) {
 
 	s.log.Info("add workflowspec", "keyOrId", workflowKey)
 
-	s.Starts[workflowKey] = false
-	s.WorkflowSpecs[workflowKey] = workflowSpec
+	s.starts[workflowKey] = false
+	s.workflowSpecs[workflowKey] = workflowSpec
 }
 
-func (s *Setting) AddStart(starts []string) {
+func (s *FermionsSetting) AddStart(starts []string) {
 	for _, start := range starts {
-		if _, ok := s.Starts[start]; ok {
-			s.Starts[start] = true
+		if _, ok := s.starts[start]; ok {
+			s.starts[start] = true
 		} else {
 			s.log.Error("workflowspec not found", "keyOrId", start)
 		}

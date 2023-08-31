@@ -10,7 +10,7 @@ import (
 )
 
 func Server() error {
-	setting := setting.New()
+	setting := setting.New().(*setting.FermionsSetting)
 
 	app := &cli.App{
 		Name:    "fermions-workflow-server",

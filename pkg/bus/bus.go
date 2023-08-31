@@ -21,12 +21,11 @@ type Bus interface {
 	Subscribe(ctx context.Context, channelName string) <-chan BusEvent
 }
 
-func Provide(setting *setting.Setting) (Bus, error) {
+func Provide(s setting.Setting) (Bus, error) {
 	log := log.New("bus")
-
 	bus := &BusImpl{
 		log:     log,
-		setting: setting,
+		setting: s,
 	}
 
 	err := bus.init()
@@ -38,7 +37,7 @@ func Provide(setting *setting.Setting) (Bus, error) {
 }
 
 type BusImpl struct {
-	setting     *setting.Setting
+	setting     setting.Setting
 	log         log.Logger
 	connector   *broadcastConnector
 	initialized bool
@@ -51,9 +50,10 @@ func (b *BusImpl) init() (err error) {
 	b.initialized = true
 
 	var connector Connector
-	if b.setting.Bus.Redis != "" {
-		b.log.Debug("redis url", "url", b.setting.Bus.Redis)
-		connector, err = NewRedis(b.setting.Bus.Redis)
+	// TODO Add suport to https://nats.io/
+	if b.setting.Bus().Redis != "" {
+		b.log.Debug("redis url", "url", b.setting.Bus().Redis)
+		connector, err = NewRedis(b.setting.Bus().Redis)
 		if err != nil {
 			return err
 		}

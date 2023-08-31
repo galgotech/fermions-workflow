@@ -12,7 +12,6 @@ import (
 	"github.com/galgotech/fermions-workflow/pkg/test"
 	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
-	"github.com/galgotech/fermions-workflow/pkg/worker/environment/local/state"
 )
 
 func TestStart(t *testing.T) {
@@ -21,8 +20,7 @@ func TestStart(t *testing.T) {
 
 	t.Run("start state operation", func(t *testing.T) {
 		env := &environmentStub{}
-		ctx := context.Background()
-		process.Start(ctx, env)
+		process.Start(env)
 		time.Sleep(1 * time.Second) // TODO: remove the sleep to improve this test
 
 		assert.Equal(t, 2, env.CountCompensateBy)
@@ -41,8 +39,8 @@ type environmentStub struct {
 	CountProduceEvents int
 }
 
-func (e *environmentStub) Start() (environment.StateStart, error) {
-	return state.NewStateStart("test0")
+func (e *environmentStub) Start() string {
+	return "test0"
 }
 
 func (s *environmentStub) State(name string) environment.State {
@@ -85,13 +83,13 @@ func (s *stateOperationStub) Run(ctx context.Context, dataIn data.Data[any]) (da
 	return dataOut, nil
 }
 
-func (s *stateOperationStub) Next(ctx context.Context) <-chan environment.StateStart {
-	ch := make(chan environment.StateStart)
-	go func() {
-		defer close(ch)
-		// ch <- "test1"
-	}()
-	return ch
+func (s *stateOperationStub) Next() (string, bool) {
+	// ch := make(chan environment.StateStart)
+	// go func() {
+	// 	defer close(ch)
+	// 	// ch <- "test1"
+	// }()
+	return "test1", true
 }
 
 // StateEvent
@@ -121,10 +119,10 @@ func (s *stateEventStub) Run(ctx context.Context, dataIn data.Data[any]) (data.D
 	return dataOut, nil
 }
 
-func (s *stateEventStub) Next(ctx context.Context) <-chan environment.StateStart {
-	ch := make(chan environment.StateStart)
-	go func() {
-		defer close(ch)
-	}()
-	return ch
+func (s *stateEventStub) Next() (string, bool) {
+	// ch := make(chan environment.StateStart)
+	// go func() {
+	// 	defer close(ch)
+	// }()
+	return "", false
 }
