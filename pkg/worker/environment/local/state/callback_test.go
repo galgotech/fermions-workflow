@@ -7,6 +7,7 @@ import (
 	"github.com/galgotech/fermions-workflow/pkg/test"
 	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
+	"github.com/serverlessworkflow/sdk-go/v2/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,7 +39,7 @@ func TestCallback(t *testing.T) {
 	state, _ := newCallback(*test.CallbackState.CallbackState, baseState, mapFunctions, mapEvents)
 
 	t.Run("run", func(t *testing.T) {
-		dataIn := data.Data[any]{"test": "test"}
+		dataIn := model.FromInterface(map[string]any{"test": "test"})
 		ctx := context.Background()
 
 		dataOut, err := state.Run(ctx, dataIn)

@@ -50,7 +50,7 @@ type Event struct {
 	onEvents []EventRef
 }
 
-func (e *Event) Run(ctx context.Context, dataIn data.Data[any]) (data.Data[any], error) {
+func (e *Event) Run(ctx context.Context, dataIn model.Object) (model.Object, error) {
 	eventOuts := make([]<-chan eventOut, len(e.onEvents))
 	for i, onEvent := range e.onEvents {
 		eventOut := e.runEvent(ctx, onEvent, dataIn)
@@ -59,14 +59,14 @@ func (e *Event) Run(ctx context.Context, dataIn data.Data[any]) (data.Data[any],
 
 	eventOut := <-concurrency.Or(eventOuts...)
 	if eventOut.Err != nil {
-		return nil, eventOut.Err
+		return data.ObjectNil, eventOut.Err
 	}
 
 	dataOut := eventOut.Data
 	return dataOut, nil
 }
 
-func (e *Event) runEvent(ctx context.Context, onEvent EventRef, dataIn data.Data[any]) <-chan eventOut {
+func (e *Event) runEvent(ctx context.Context, onEvent EventRef, dataIn model.Object) <-chan eventOut {
 	ch := make(chan eventOut)
 	go func() {
 		defer close(ch)
@@ -82,6 +82,6 @@ func (e *Event) runEvent(ctx context.Context, onEvent EventRef, dataIn data.Data
 
 type eventOut struct {
 	OnEvent EventRef
-	Data    data.Data[any]
+	Data    model.Object
 	Err     error
 }

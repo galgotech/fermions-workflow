@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	"github.com/serverlessworkflow/sdk-go/v2/model"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/galgotech/fermions-workflow/pkg/test"
-	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
 )
 
@@ -44,10 +44,10 @@ func TestEvent(t *testing.T) {
 	}()
 
 	t.Run("run", func(t *testing.T) {
-		dataIn := data.Data[any]{"test": "test"}
+		dataIn := model.FromInterface(map[string]any{"test": "test"})
 		dataOut, err := state.Run(context.Background(), dataIn)
 		assert.NoError(t, err)
-		assert.Equal(t, data.Data[any]{"test": "test"}, dataOut)
+		assert.Equal(t, model.FromInterface(map[string]any{"test": "test"}), dataOut)
 	})
 }
 

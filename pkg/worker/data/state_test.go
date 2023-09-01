@@ -17,5 +17,5 @@ func TestCurrentStateString(t *testing.T) {
 	currentState := state.State("test")
 	assert.NotNil(t, currentState)
 
-	assert.Equal(t, nil, currentState["test"])
+	assert.Equal(t, nil, currentState)
 }

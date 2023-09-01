@@ -7,6 +7,7 @@ import (
 	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
 	"github.com/galgotech/fermions-workflow/pkg/worker/filter"
+	"github.com/serverlessworkflow/sdk-go/v2/model"
 )
 
 func newEventRef(events []environment.Event, actions Actions, filterData filter.Filter, filterToStateData filter.Filter, exclusive bool) (e EventRef, err error) {
@@ -27,31 +28,31 @@ type EventRef struct {
 	actions   Actions
 }
 
-func (e *EventRef) Run(ctx context.Context, dataIn data.Data[any]) (data.Data[any], error) {
+func (e *EventRef) Run(ctx context.Context, dataIn model.Object) (model.Object, error) {
 	dataIn, err := e.filterData.Run(dataIn)
 	if err != nil {
-		return nil, err
+		return data.ObjectNil, err
 	}
 
 	dataIn, err = e.filterToStateData.Run(dataIn)
 	if err != nil {
-		return nil, err
+		return data.ObjectNil, err
 	}
 
 	dataIn, err = e.consumeEvents(ctx, dataIn)
 	if err != nil {
-		return nil, err
+		return data.ObjectNil, err
 	}
 
 	dataOut, err := e.actions.Run(dataIn)
 	if err != nil {
-		return nil, err
+		return data.ObjectNil, err
 	}
 
 	return dataOut, err
 }
 
-func (e *EventRef) consumeEvents(ctx context.Context, dataIn data.Data[any]) (data.Data[any], error) {
+func (e *EventRef) consumeEvents(ctx context.Context, dataIn model.Object) (model.Object, error) {
 	ctxSubscribe, cancelSubscribe := context.WithCancel(ctx)
 	defer cancelSubscribe()
 
@@ -63,17 +64,17 @@ func (e *EventRef) consumeEvents(ctx context.Context, dataIn data.Data[any]) (da
 	if e.exclusive {
 		eventRef := <-concurrency.Or(eventRefs...)
 		if eventRef.Err != nil {
-			return nil, eventRef.Err
+			return data.ObjectNil, eventRef.Err
 		}
-		dataIn.Merge(eventRef.Data)
+		data.Merge(dataIn, eventRef.Data)
 
 	} else {
 		for _, ch := range eventRefs {
 			eventRef := <-ch
 			if eventRef.Err != nil {
-				return nil, eventRef.Err
+				return data.ObjectNil, eventRef.Err
 			}
-			dataIn.Merge(eventRef.Data)
+			data.Merge(data.ObjectNil, eventRef.Data)
 		}
 	}
 
@@ -87,7 +88,7 @@ func (e *EventRef) runEventRef(ctx context.Context, event environment.Event) <-c
 		event, err := event.Consume(ctx)
 		if err != nil {
 			ch <- eventRefOut{
-				Data: nil,
+				Data: data.ObjectNil,
 				Err:  err,
 			}
 			return
@@ -104,6 +105,6 @@ func (e *EventRef) runEventRef(ctx context.Context, event environment.Event) <-c
 }
 
 type eventRefOut struct {
-	Data data.Data[any]
+	Data model.Object
 	Err  error
 }

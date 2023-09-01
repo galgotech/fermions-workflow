@@ -6,9 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/serverlessworkflow/sdk-go/v2/model"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 )
 
 var specFhub = `
@@ -68,18 +67,20 @@ func TestFhub(t *testing.T) {
 		err := functionRest.Init()
 		assert.NoError(t, err)
 
-		dataIn := data.Data[any]{
+		dataIn := model.FromInterface(map[string]any{
 			"arg0": "test",
 			"arg1": "test2",
-		}
+		})
 		dataOut, err := functionRest.Run(dataIn)
 		assert.NoError(t, err)
-		assert.Equal(t, data.Data[any]{"ok": true}, dataOut)
 
-		dataIn = data.Data[any]{
+		dataOut2 := model.FromInterface(map[string]any{"ok": true})
+		assert.Equal(t, dataOut2, dataOut)
+
+		dataIn = model.FromInterface(map[string]any{
 			"arg0": "test",
 			"arg2": "test2",
-		}
+		})
 		_, err = functionRest.Run(dataIn)
 		assert.Error(t, err)
 	})

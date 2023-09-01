@@ -1,11 +1,9 @@
 package filter
 
 import (
-	"errors"
-
-	"github.com/itchyny/gojq"
-
 	"github.com/galgotech/fermions-workflow/pkg/worker/data"
+	"github.com/itchyny/gojq"
+	"github.com/serverlessworkflow/sdk-go/v2/model"
 )
 
 func NewFilter(filter string) (Filter, error) {
@@ -24,31 +22,27 @@ func NewFilter(filter string) (Filter, error) {
 }
 
 type Filter interface {
-	Run(data data.Data[any]) (data.Data[any], error)
+	Run(data model.Object) (model.Object, error)
 }
 
 type WorkflowFilter struct {
 	query *gojq.Query
 }
 
-func (f *WorkflowFilter) Run(dataIn data.Data[any]) (dataOut data.Data[any], err error) {
-	iter := f.query.Run(dataIn.ToMap())
+func (f *WorkflowFilter) Run(dataIn model.Object) (model.Object, error) {
+	iter := f.query.Run(data.ToInterface(dataIn))
 	v, ok := iter.Next()
 	if !ok {
 		return dataIn, nil
 	}
-	if val, ok := v.(map[string]any); ok {
-		dataOut.FromMap(val)
-	} else {
-		return nil, errors.New("invalid filter response")
-	}
 
-	return dataOut, err
+	dataOut := data.FromInterface(v)
+	return dataOut, nil
 }
 
 type EmptyFilter struct {
 }
 
-func (f *EmptyFilter) Run(dataIn data.Data[any]) (data.Data[any], error) {
+func (f *EmptyFilter) Run(dataIn model.Object) (model.Object, error) {
 	return dataIn, nil
 }

@@ -1,8 +1,8 @@
 package function
 
 import (
-	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	"github.com/galgotech/fermions-workflow/pkg/worker/filter"
+	"github.com/serverlessworkflow/sdk-go/v2/model"
 )
 
 func newExpression(operation string) *FunctionExpression {
@@ -21,6 +21,6 @@ func (w *FunctionExpression) Init() (err error) {
 	return err
 }
 
-func (w *FunctionExpression) Run(dataIn data.Data[any]) (dataOut data.Data[any], err error) {
+func (w *FunctionExpression) Run(dataIn model.Object) (dataOut model.Object, err error) {
 	return w.filter.Run(dataIn)
 }

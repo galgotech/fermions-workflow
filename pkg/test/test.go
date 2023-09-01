@@ -60,7 +60,7 @@ var StateInject = model.State{
 		Data: map[string]model.Object{
 			"test0": model.FromString("testValStr"),
 			"test1": model.FromInt(1),
-			"test2": model.FromRaw("bytes"),
+			"test2": model.FromString("bytes"),
 		},
 	},
 }

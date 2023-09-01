@@ -82,8 +82,8 @@ func (r *WorkflowRuntime) state(stateCtx *stateIn) {
 
 		r.log.Info("state run", "workflow", env.Spec().Name, "state", stateCtx.state, "type", state.Type(), "trace", ctx.Value(ContextKeyTrace))
 
-		var dataIn data.Data[any]
-		var dataOut data.Data[any]
+		dataIn := model.Object{}
+		dataOut := model.Object{}
 
 		r.log.Debug("state filter input", "workflow", env.Spec().Name, "state", stateCtx.state, "trace", ctx.Value(ContextKeyTrace))
 		dataIn, err := state.FilterInput(dataIn)

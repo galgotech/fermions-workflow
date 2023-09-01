@@ -9,10 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	fhubModel "github.com/galgotech/fhub-go/model"
 	"github.com/serverlessworkflow/sdk-go/v2/model"
-
-	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 )
 
 func newFhub(f model.Function) *FunctionFhub {
@@ -65,38 +64,38 @@ func (w *FunctionFhub) Init() error {
 	return nil
 }
 
-func (w *FunctionFhub) Run(dataIn data.Data[any]) (data.Data[any], error) {
-	jsonData, err := dataIn.Marshal()
+func (w *FunctionFhub) Run(dataIn model.Object) (model.Object, error) {
+	jsonData, err := dataIn.MarshalJSON()
 	if err != nil {
-		return nil, err
+		return data.ObjectNil, err
 	}
 
 	if err := w.function.ValidateInput(jsonData); err != nil {
-		return nil, fmt.Errorf("invalid input: %q", err)
+		return data.ObjectNil, fmt.Errorf("invalid input: %q", err)
 	}
 
 	req, err := http.NewRequest(http.MethodPost, w.url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, err
+		return data.ObjectNil, err
 	}
 
 	resp, err := w.Http.Do(req)
 	if err != nil {
-		return nil, err
+		return data.ObjectNil, err
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return data.ObjectNil, err
 	}
 	if err := w.function.ValidateOutput(body); err != nil {
-		return nil, fmt.Errorf("invalid output: %q", err)
+		return data.ObjectNil, fmt.Errorf("invalid output: %q", err)
 	}
 
-	dataOut := data.Data[any]{}
-	err = dataOut.Unmarshal(body)
+	dataOut := model.Object{}
+	err = dataOut.UnmarshalJSON(body)
 	if err != nil {
-		return nil, err
+		return data.ObjectNil, err
 	}
 
 	return dataOut, nil

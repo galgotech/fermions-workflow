@@ -8,7 +8,6 @@ import (
 	"github.com/serverlessworkflow/sdk-go/v2/model"
 
 	"github.com/galgotech/fermions-workflow/pkg/log"
-	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
 	"github.com/galgotech/fermions-workflow/pkg/worker/filter"
 )
@@ -26,11 +25,11 @@ func NewBase(spec model.State, mapEvents environment.MapEvents) (s StateImpl, er
 	produceEvents := make([]*ProduceEventImp, len(produceEventSpec))
 	for i, spec := range produceEventSpec {
 		var f filter.Filter
-		eventData := data.Data[any]{}
-		if spec.Data.StrVal != "" {
-			f, err = filter.NewFilter(spec.Data.StrVal)
+		eventData := model.Object{}
+		if spec.Data.StringValue != "" {
+			f, err = filter.NewFilter(spec.Data.StringValue)
 			if err != nil {
-				s.log.Error("fail load data 1", "data", spec.Data.StrVal)
+				s.log.Error("fail load data 1", "data", spec.Data.StringValue)
 				return s, err
 			}
 		} else {
@@ -67,10 +66,10 @@ type ProduceEventImp struct {
 	spec   model.ProduceEvent
 	event  environment.Event
 	filter filter.Filter
-	data   data.Data[any]
+	data   model.Object
 }
 
-func (p *ProduceEventImp) Data(dataIn data.Data[any]) (data.Data[any], error) {
+func (p *ProduceEventImp) Data(dataIn model.Object) (model.Object, error) {
 	if p.filter != nil {
 		return p.filter.Run(dataIn)
 	}
@@ -102,22 +101,22 @@ func (t *StateImpl) Transition() string {
 	return t.spec.BaseState.Transition.NextState
 }
 
-func (t *StateImpl) FilterInput(data data.Data[any]) (data.Data[any], error) {
+func (t *StateImpl) FilterInput(data model.Object) (model.Object, error) {
 	return t.filterInput.Run(data)
 }
 
-func (t *StateImpl) FilterOutput(data data.Data[any]) (data.Data[any], error) {
+func (t *StateImpl) FilterOutput(data model.Object) (model.Object, error) {
 	return t.filterOutput.Run(data)
 }
 
-func (t *StateImpl) ProduceEvents(ctx context.Context, dataIn data.Data[any]) error {
+func (t *StateImpl) ProduceEvents(ctx context.Context, dataIn model.Object) error {
 	for _, produceEvent := range t.produceEvents {
 		// dataOut, err := produceEvent.Data(dataIn)
 		// if err != nil {
 		// 	return err
 		// }
 
-		// TODO: Create new event in data.Data[any]
+		// TODO: Create new event in model.Object
 		event := cloudevents.NewEvent()
 		// data, err := json.Marshal(dataOut)
 		// if err != nil {

@@ -3,9 +3,9 @@ package state
 import (
 	"context"
 
-	"github.com/galgotech/fermions-workflow/pkg/worker/data"
-	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
 	"github.com/serverlessworkflow/sdk-go/v2/model"
+
+	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
 )
 
 func newSwitch(spec model.SwitchState, stateBase StateImpl) (environment.State, error) {
@@ -33,7 +33,7 @@ type Switch struct {
 	defaultCondition SwitchCondition
 }
 
-func (s *Switch) Run(ctx context.Context, dataIn data.Data[any]) (data.Data[any], error) {
+func (s *Switch) Run(ctx context.Context, dataIn model.Object) (model.Object, error) {
 	return dataIn, nil
 }
 

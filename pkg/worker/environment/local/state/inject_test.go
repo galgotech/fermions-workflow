@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/serverlessworkflow/sdk-go/v2/model"
+
 	"github.com/galgotech/fermions-workflow/pkg/test"
-	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
 	"github.com/stretchr/testify/assert"
 )
@@ -22,9 +23,8 @@ func Test_newInject(t *testing.T) {
 		assert.NotNil(t, state)
 		assert.Equal(t, "stateInject", state.Name())
 
-		dataIn := data.Data[any]{}
-		dataOut, err := state.Run(context.Background(), dataIn)
+		dataOut, err := state.Run(context.Background(), model.Object{})
 		assert.NoError(t, err)
-		assert.Equal(t, dataIn, dataOut)
+		assert.Equal(t, model.Object{}, dataOut)
 	})
 }

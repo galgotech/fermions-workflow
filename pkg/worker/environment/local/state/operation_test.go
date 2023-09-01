@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/serverlessworkflow/sdk-go/v2/model"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/galgotech/fermions-workflow/pkg/test"
-	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
 )
 
@@ -34,9 +34,9 @@ func Test_newOperation(t *testing.T) {
 		state, err := newOperation(*test.States[0].OperationState, baseState, mapFunctions)
 		assert.NoError(t, err)
 
-		dataIn := data.Data[any]{"test": "test"}
+		dataIn := model.FromInterface(map[string]any{"test": "test"})
 		dataOut, err := state.Run(context.Background(), dataIn)
 		assert.NoError(t, err)
-		assert.Equal(t, data.Data[any]{"test": "test"}, dataOut)
+		assert.Equal(t, model.FromInterface(map[string]any{"test": "test"}), dataOut)
 	})
 }

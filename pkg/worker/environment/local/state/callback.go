@@ -5,7 +5,6 @@ import (
 
 	"github.com/serverlessworkflow/sdk-go/v2/model"
 
-	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
 )
 
@@ -43,6 +42,6 @@ type Callback struct {
 	EventRef
 }
 
-func (c *Callback) Run(ctx context.Context, dataIn data.Data[any]) (dataOut data.Data[any], err error) {
+func (c *Callback) Run(ctx context.Context, dataIn model.Object) (dataOut model.Object, err error) {
 	return dataIn, nil
 }

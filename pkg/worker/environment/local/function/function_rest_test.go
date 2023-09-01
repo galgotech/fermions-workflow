@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/galgotech/fermions-workflow/pkg/worker/data"
+	"github.com/serverlessworkflow/sdk-go/v2/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -83,7 +84,7 @@ func TestRest(t *testing.T) {
 			Operation: server.URL + "/function.json#test",
 		}
 
-		_, err := functionRest.Run(data.Data[any]{})
+		_, err := functionRest.Run(model.Object{})
 		assert.Error(t, err)
 	})
 
@@ -96,7 +97,7 @@ func TestRest(t *testing.T) {
 		err := functionRest.Init()
 		assert.Nil(t, err)
 
-		dataOut, err := functionRest.Run(data.Data[any]{})
+		dataOut, err := functionRest.Run(model.Object{})
 		assert.Nil(t, err)
 		assert.Equal(t, data.Data[any]{"test": "test"}, dataOut)
 	})

@@ -52,7 +52,7 @@ func (e *environmentStub) CompensateBy(transition environment.State) error {
 	return nil
 }
 
-func (e *environmentStub) ProduceEvents(ctx context.Context, busEvent bus.Bus, transition environment.State, dataIn data.Data[any]) {
+func (e *environmentStub) ProduceEvents(ctx context.Context, busEvent bus.Bus, transition environment.State, dataIn model.Object) {
 	e.CountProduceEvents++
 }
 
@@ -70,16 +70,16 @@ func (s *stateOperationStub) Name() string {
 	return s.name
 }
 
-func (s *stateOperationStub) FilterInput(dataIn data.Data[any]) (data.Data[any], error) {
+func (s *stateOperationStub) FilterInput(dataIn model.Object) (model.Object, error) {
 	return dataIn, nil
 }
 
-func (s *stateOperationStub) FilterOutput(dataIn data.Data[any]) (data.Data[any], error) {
+func (s *stateOperationStub) FilterOutput(dataIn model.Object) (model.Object, error) {
 	return dataIn, nil
 }
 
-func (s *stateOperationStub) Run(ctx context.Context, dataIn data.Data[any]) (data.Data[any], error) {
-	dataOut := data.Data[interface{}]{"test": s.name}
+func (s *stateOperationStub) Run(ctx context.Context, dataIn model.Object) (model.Object, error) {
+	dataOut := model.FromInterface(map[string]any{"test": s.name})
 	return dataOut, nil
 }
 
@@ -106,16 +106,16 @@ func (s *stateEventStub) Name() string {
 	return s.name
 }
 
-func (s *stateEventStub) FilterInput(dataIn data.Data[any]) (data.Data[any], error) {
+func (s *stateEventStub) FilterInput(dataIn model.Object) (model.Object, error) {
 	return dataIn, nil
 }
 
-func (s *stateEventStub) FilterOutput(dataIn data.Data[any]) (data.Data[any], error) {
+func (s *stateEventStub) FilterOutput(dataIn model.Object) (model.Object, error) {
 	return dataIn, nil
 }
 
-func (s *stateEventStub) Run(ctx context.Context, dataIn data.Data[any]) (data.Data[any], error) {
-	dataOut := data.Data[interface{}]{"test": s.name}
+func (s *stateEventStub) Run(ctx context.Context, dataIn model.Object) (model.Object, error) {
+	dataOut := model.FromInterface(map[string]any{"test": s.name})
 	return dataOut, nil
 }
 

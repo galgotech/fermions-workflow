@@ -7,7 +7,6 @@ import (
 	"github.com/serverlessworkflow/sdk-go/v2/model"
 
 	"github.com/galgotech/fermions-workflow/pkg/bus"
-	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 )
 
 type MapFunctions map[string]Function
@@ -26,7 +25,7 @@ type Environment interface {
 
 type Function interface {
 	Init() error
-	Run(data data.Data[any]) (data.Data[any], error)
+	Run(data model.Object) (model.Object, error)
 }
 
 type Event interface {
@@ -38,9 +37,9 @@ type State interface {
 	Type() model.StateType
 	Name() string
 
-	FilterInput(data.Data[any]) (data.Data[any], error)
-	FilterOutput(data.Data[any]) (data.Data[any], error)
-	Run(ctx context.Context, dataIn data.Data[any]) (data.Data[any], error)
-	ProduceEvents(ctx context.Context, data data.Data[any]) error
+	FilterInput(model.Object) (model.Object, error)
+	FilterOutput(model.Object) (model.Object, error)
+	Run(ctx context.Context, dataIn model.Object) (model.Object, error)
+	ProduceEvents(ctx context.Context, data model.Object) error
 	Next() (string, bool)
 }

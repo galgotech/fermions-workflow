@@ -2,6 +2,8 @@ module github.com/galgotech/fermions-workflow
 
 go 1.19
 
+replace github.com/serverlessworkflow/sdk-go/v2 => github.com/galgotech/sdk-go/v2 v2.0.0-20230901022336-3a8309c1e503
+
 require (
 	cuelang.org/go v0.5.0
 	github.com/centrifugal/centrifuge v0.29.2

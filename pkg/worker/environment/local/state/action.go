@@ -1,10 +1,11 @@
 package state
 
 import (
+	"github.com/serverlessworkflow/sdk-go/v2/model"
+
 	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
 	"github.com/galgotech/fermions-workflow/pkg/worker/filter"
-	"github.com/serverlessworkflow/sdk-go/v2/model"
 )
 
 func newAction(specs []model.Action, functions environment.MapFunctions) (Actions, error) {
@@ -36,7 +37,7 @@ type Action struct {
 	filterToStateData filter.Filter
 }
 
-func (a *Action) Run(dataIn data.Data[any]) (dataOut data.Data[any], err error) {
+func (a *Action) Run(dataIn model.Object) (dataOut model.Object, err error) {
 	dataIn, err = a.filterFromStateData.Run(dataIn)
 	if err != nil {
 		return
@@ -62,11 +63,11 @@ func (a *Action) Run(dataIn data.Data[any]) (dataOut data.Data[any], err error) 
 
 type Actions []*Action
 
-func (a Actions) Run(dataIn data.Data[any]) (dataOut data.Data[any], err error) {
+func (a Actions) Run(dataIn model.Object) (dataOut model.Object, err error) {
 	for _, action := range a {
 		dataOut, err = action.Run(dataIn)
 		if err != nil {
-			return nil, err
+			return data.ObjectNil, err
 		}
 		dataIn = dataOut
 	}

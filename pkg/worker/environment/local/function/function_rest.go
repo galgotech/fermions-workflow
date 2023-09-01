@@ -1,7 +1,6 @@
 package function
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -9,10 +8,10 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	openapiloads "github.com/go-openapi/loads"
 	"github.com/go-openapi/spec"
-
-	"github.com/galgotech/fermions-workflow/pkg/worker/data"
+	"github.com/serverlessworkflow/sdk-go/v2/model"
 )
 
 func newRest(operation string) *FunctionRest {
@@ -57,16 +56,17 @@ func (w *FunctionRest) Init() error {
 	return nil
 }
 
-func (w *FunctionRest) Run(dataIn data.Data[any]) (data.Data[any], error) {
+func (w *FunctionRest) Run(dataIn model.Object) (model.Object, error) {
 	if w.method == "" || w.url == nil && w.op == nil {
-		return nil, errors.New("operation not initialized")
+		return data.ObjectNil, errors.New("operation not initialized")
 	}
 
+	dataMapIn := data.ToInterface(dataIn).(map[string]any)
 	url := *w.url
 	for _, parameter := range w.op.Parameters {
-		value, ok := dataIn[parameter.Name].(string)
+		value, ok := dataMapIn[parameter.Name].(string)
 		if !ok && parameter.Required {
-			return nil, fmt.Errorf("not found parameter %q", value)
+			return data.ObjectNil, fmt.Errorf("not found parameter %q", value)
 		}
 
 		if parameter.In == "query" {
@@ -78,23 +78,23 @@ func (w *FunctionRest) Run(dataIn data.Data[any]) (data.Data[any], error) {
 
 	req, err := http.NewRequest(w.method, w.url.String(), nil)
 	if err != nil {
-		return nil, err
+		return data.ObjectNil, err
 	}
 
 	resp, err := w.Http.Do(req)
 	if err != nil {
-		return nil, err
+		return data.ObjectNil, err
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return data.ObjectNil, err
 	}
 
-	dataOut := data.Data[any]{}
-	err = json.Unmarshal(bodyBytes, &dataOut)
+	dataOut := model.Object{}
+	err = dataOut.UnmarshalJSON(bodyBytes)
 	if err != nil {
-		return nil, err
+		return data.ObjectNil, err
 	}
 
 	return dataOut, nil
