@@ -2,79 +2,73 @@ package bus
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
 	"github.com/galgotech/fermions-workflow/pkg/log"
 )
 
-func NewChannel() Connector {
+func NewChannel(publisTimeout time.Duration) Connector {
 	return &channelConnector{
-		log:      log.New("bus-channel"),
-		channels: make(map[string]chan []byte),
+		log:           log.New("bus-channel"),
+		publisTimeout: publisTimeout,
+		channels:      make(map[string]chan []byte),
 	}
 }
 
+type channel struct {
+	channelLock sync.RWMutex
+	channel     map[string]chan []byte
+}
+
 type channelConnector struct {
-	log log.Logger
+	log           log.Logger
+	publisTimeout time.Duration
 
 	channelsLock sync.RWMutex
 	channels     map[string]chan []byte
 }
 
 func (r *channelConnector) Publish(ctx context.Context, channelName string, data []byte) error {
-	channel := r.channelPubsub(channelName)
-	if channel == nil {
+	r.channelsLock.RLock()
+	channel, ok := r.channels[channelName]
+	if !ok {
+		r.log.Debug("channel does not exist", "channelName", channelName)
 		return nil
 	}
 
-	go func() {
-		select {
-		case <-time.After(1 * time.Second):
-		case <-ctx.Done():
-		case channel <- data:
-		}
-	}()
+	select {
+	case <-time.After(r.publisTimeout):
+		r.log.Warn("bus channel publish timeout", "channelName", channelName)
+		return errors.New("bus channel publish timeout")
+	case <-ctx.Done():
+	case channel <- data:
+	}
+	r.channelsLock.RUnlock()
+
 	return nil
 }
 
 func (r *channelConnector) Subscribe(ctx context.Context, channelName string) <-chan []byte {
-	ch := r.channelPubsub(channelName)
-	if ch == nil {
-		ch = r.createChannelPubsub(ctx, channelName)
-	}
-	return ch
-}
-
-func (r *channelConnector) channelPubsub(channelName string) chan []byte {
-	r.channelsLock.RLock()
-	defer r.channelsLock.RUnlock()
-	if val, ok := r.channels[channelName]; ok {
-		return val
-	}
-	return nil
-}
-
-func (r *channelConnector) createChannelPubsub(ctx context.Context, channelName string) chan []byte {
 	r.channelsLock.Lock()
 	defer r.channelsLock.Unlock()
 
-	channel := make(chan []byte)
-	r.channels[channelName] = channel
-
-	go func() {
-		select {
-		case <-ctx.Done():
-			r.deleteChannelPubsub(channelName)
-		}
-	}()
+	channel, ok := r.channels[channelName]
+	if !ok {
+		channel := make(chan []byte)
+		r.channels[channelName] = channel
+		go func() {
+			select {
+			case <-ctx.Done():
+				r.channelsLock.Lock()
+				defer r.channelsLock.Unlock()
+				ch := r.channels[channelName]
+				delete(r.channels, channelName)
+				close(ch)
+			}
+		}()
+	}
 
 	return channel
-}
-
-func (r *channelConnector) deleteChannelPubsub(channelName string) {
-	r.channelsLock.Lock()
-	defer r.channelsLock.Unlock()
-	close(r.channels[channelName])
-	delete(r.channels, channelName)
 }
