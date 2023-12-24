@@ -1,8 +1,9 @@
 package state
 
 import (
-	"github.com/galgotech/fermions-workflow/pkg/worker/filter"
 	"github.com/serverlessworkflow/sdk-go/v2/model"
+
+	"github.com/galgotech/fermions-workflow/pkg/worker/filter"
 )
 
 func initializeStateDataFilter(spec *model.StateDataFilter) (filter.Filter, filter.Filter, error) {
@@ -53,30 +54,25 @@ func initializeEventDataFilter(sepc model.EventDataFilter) (filter.Filter, filte
 	return filterData, filterToStateData, nil
 }
 
-func initializeActionDataFilter(spec model.ActionDataFilter) (filter.Filter, filter.Filter, filter.Filter, error) {
-	filterFromStateData, err := filter.NewFilter(spec.FromStateData)
+func initializeActionDataFilter(spec model.ActionDataFilter) (filterFromStateData filter.Filter, filterResults filter.Filter, filterToStateData filter.Filter, err error) {
+	filterFromStateData, err = filter.NewFilter(spec.FromStateData)
 	if err != nil {
-		return nil, nil, nil, err
+		return
 	}
 
-	var results, toStateData string
-	if spec.UseResults {
-		results = spec.Results
-		toStateData = spec.ToStateData
-	} else {
-		results = ""
-		toStateData = ""
+	if !spec.UseResults {
+		return
 	}
 
-	filterResults, err := filter.NewFilter(results)
+	filterResults, err = filter.NewFilter(spec.Results)
 	if err != nil {
-		return nil, nil, nil, err
+		return
 	}
 
-	filterToStateData, err := filter.NewFilter(toStateData)
+	filterToStateData, err = filter.NewFilter(spec.ToStateData)
 	if err != nil {
-		return nil, nil, nil, err
+		return
 	}
 
-	return filterResults, filterToStateData, filterFromStateData, nil
+	return
 }

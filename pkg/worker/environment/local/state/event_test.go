@@ -2,66 +2,84 @@ package state
 
 import (
 	"context"
+	"sync"
 	"testing"
 
-	cloudevents "github.com/cloudevents/sdk-go/v2"
+	"github.com/serverlessworkflow/sdk-go/v2/builder"
 	"github.com/serverlessworkflow/sdk-go/v2/model"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/galgotech/fermions-workflow/pkg/test"
-	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
 )
 
 func Test_newEvent(t *testing.T) {
-	mapFunctions := environment.MapFunctions{}
-	mapFunctions["test"] = &functionStub{}
-	mapEvents := environment.MapEvents{}
-	mapEvents["event0"] = &eventStub{ch: make(chan cloudevents.Event)}
+	stateBuilder := model.NewStateBuilder().
+		Type(model.StateTypeEvent).
+		Name("stateEvent0")
+	stateBuilder.End().Terminate(true)
+	eventStateBuilder := stateBuilder.EventState()
+	onEvent := eventStateBuilder.AddOnEvents()
+	onEvent.EventRefs([]string{"event0"})
+	onEvent.AddActions().Name("action0").FunctionRef().RefName("test0")
 
-	baseState, _ := NewBase(test.EventState, mapEvents)
-	state, err := newEvent(*test.EventState.EventState, baseState, mapFunctions, mapEvents)
-	assert.Nil(t, err)
-	assert.NotNil(t, state)
-	assert.Equal(t, "event1", state.Name())
+	eventState := stateBuilder.Build()
+	if !assert.NoError(t, builder.Validate(eventState)) {
+		return
+	}
 
+	baseState, err := NewBase(eventState, test.MapEvents)
+	if assert.NoError(t, err) {
+		stateEnv, err := newEvent(eventStateBuilder.Build(), baseState, test.MapFunctions, test.MapEvents)
+		if assert.NoError(t, err) {
+			assert.NotNil(t, stateEnv)
+			assert.Equal(t, "stateEvent0", stateEnv.Name())
+		}
+	}
 }
 
 func TestEvent(t *testing.T) {
-	mapFunctions := environment.MapFunctions{}
-	mapFunctions["test"] = &functionStub{}
-	mapEvents := environment.MapEvents{}
-	mapEvents["nameEvent0"] = &eventStub{ch: make(chan cloudevents.Event)}
+	stateBuilder := model.NewStateBuilder().
+		Type(model.StateTypeEvent).
+		Name("stateEvent0")
+	stateBuilder.End().Terminate(true)
+	actionBuilder := stateBuilder.EventState().
+		AddOnEvents().
+		EventRefs([]string{"event0"}).
+		AddActions().
+		Name("action0")
+	actionBuilder.FunctionRef().RefName("test0")
 
-	baseState, _ := NewBase(test.EventState, mapEvents)
-	state, _ := newEvent(*test.EventState.EventState, baseState, mapFunctions, mapEvents)
+	eventState := stateBuilder.Build()
+	if !assert.NoError(t, builder.Validate(eventState)) {
+		return
+	}
 
-	go func() {
-		event := cloudevents.NewEvent()
-		event.SetSource("nameEvent0")
-		event.SetType("type")
-		event.SetData("application/json", map[string]string{"a": "b"})
-		mapEvents["nameEvent0"].Produce(context.Background(), event)
-	}()
-
-	t.Run("run", func(t *testing.T) {
-		dataIn := model.FromInterface(map[string]any{"test": "test"})
-		dataOut, err := state.Run(context.Background(), dataIn)
+	for i := 0; i < 1; i++ {
+		baseState, err := NewBase(eventState, test.MapEvents)
 		assert.NoError(t, err)
-		assert.Equal(t, model.FromInterface(map[string]any{"test": "test"}), dataOut)
-	})
-}
+		state, err := newEvent(*eventState.EventState, baseState, test.MapFunctions, test.MapEvents)
+		assert.NoError(t, err)
 
-type eventStub struct {
-	environment.Event
-	ch chan cloudevents.Event
-}
+		var wg sync.WaitGroup
+		wg.Add(1)
 
-func (e *eventStub) Produce(ctx context.Context, event cloudevents.Event) error {
-	e.ch <- event
-	return nil
-}
+		go func() {
+			dataIn := model.FromMap(map[string]any{"input": "value_input"})
+			dataOut, err := state.Run(context.Background(), dataIn)
+			if assert.NoError(t, err) {
+				dataExpected := model.FromMap(map[string]any{
+					"input": "value_input",
+					"out0":  "value_out0",
+					"event": "value_event",
+				})
+				assert.Equal(t, dataExpected, dataOut)
+			}
+			wg.Done()
+		}()
 
-func (e *eventStub) Consume(ctx context.Context) (cloudevents.Event, error) {
-	event := <-e.ch
-	return event, nil
+		err = test.MapEvents["event0"].Produce(context.Background(), model.FromMap(map[string]any{"event": "value_event"}))
+		assert.NoError(t, err)
+
+		wg.Wait()
+	}
 }

@@ -82,8 +82,7 @@ func (r *WorkflowRuntime) state(stateCtx *stateIn) {
 
 		r.log.Info("state run", "workflow", env.Spec().Name, "state", stateCtx.state, "type", state.Type(), "trace", ctx.Value(ContextKeyTrace))
 
-		dataIn := model.Object{}
-		dataOut := model.Object{}
+		dataIn := r.dataManager.Get()
 
 		r.log.Debug("state filter input", "workflow", env.Spec().Name, "state", stateCtx.state, "trace", ctx.Value(ContextKeyTrace))
 		dataIn, err := state.FilterInput(dataIn)
@@ -93,7 +92,7 @@ func (r *WorkflowRuntime) state(stateCtx *stateIn) {
 		}
 
 		r.log.Debug("state run", "workflow", env.Spec().Name, "state", stateCtx.state, "trace", ctx.Value(ContextKeyTrace))
-		dataOut, err = state.Run(ctx, dataIn)
+		dataOut, err := state.Run(ctx, dataIn)
 		if err != nil {
 			r.log.Error("state error", "state", state.Name(), "err", err.Error(), "trace", ctx.Value(ContextKeyTrace))
 			return
@@ -107,7 +106,11 @@ func (r *WorkflowRuntime) state(stateCtx *stateIn) {
 		}
 
 		r.log.Debug("state data save", "workflow", env.Spec().Name, "state", stateCtx.state, "trace", ctx.Value(ContextKeyTrace))
-		r.dataManager.SetState(state.Name(), dataOut)
+		err = r.dataManager.Set(dataOut)
+		if err != nil {
+			r.log.Error("state set error", "state", state.Name(), "err", err.Error(), "trace", ctx.Value(ContextKeyTrace))
+			return
+		}
 
 		r.log.Debug("state compensate by", "workflow", env.Spec().Name, "state", stateCtx.state, "trace", ctx.Value(ContextKeyTrace))
 		err = env.CompensateBy(state)

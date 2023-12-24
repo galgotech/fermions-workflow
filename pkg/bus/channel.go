@@ -2,73 +2,68 @@ package bus
 
 import (
 	"context"
-	"errors"
 	"sync"
-	"time"
 
 	"github.com/galgotech/fermions-workflow/pkg/log"
 )
 
-func NewChannel(publisTimeout time.Duration) Connector {
-	return &channelConnector{
-		log:           log.New("bus-channel"),
-		publisTimeout: publisTimeout,
-		channels:      make(map[string]chan []byte),
+func NewEventChannel(ctx context.Context, chanelName string) Connector {
+	ec := &eventChannel{
+		log:       log.New("bus-event-channel"),
+		name:      chanelName,
+		subscribe: make(chan chan []byte),
+		publish:   make(chan []byte),
+		channels:  make([]chan []byte, 0),
 	}
+	ec.init(ctx)
+	return ec
 }
 
-type channel struct {
-	channelLock sync.RWMutex
-	channel     map[string]chan []byte
+type eventChannel struct {
+	log       log.Logger
+	name      string
+	subscribe chan chan []byte
+	publish   chan []byte
+	channels  []chan []byte
+	lock      sync.RWMutex
 }
 
-type channelConnector struct {
-	log           log.Logger
-	publisTimeout time.Duration
-
-	channelsLock sync.RWMutex
-	channels     map[string]chan []byte
+func (ec *eventChannel) init(ctx context.Context) {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				ec.log.Debug("channel close")
+				for _, channel := range ec.channels {
+					close(channel)
+				}
+				ec.channels = make([]chan []byte, 0)
+			case channel := <-ec.subscribe:
+				ec.log.Debug("event subscribe")
+				ec.channels = append(ec.channels, channel)
+			case publish := <-ec.publish:
+				for i, channel := range ec.channels {
+					ec.log.Debug("event publish", "channel-index", i)
+					channel <- publish
+					close(channel)
+				}
+				ec.channels = make([]chan []byte, 0)
+			}
+		}
+	}()
 }
 
-func (r *channelConnector) Publish(ctx context.Context, channelName string, data []byte) error {
-	r.channelsLock.RLock()
-	channel, ok := r.channels[channelName]
-	if !ok {
-		r.log.Debug("channel does not exist", "channelName", channelName)
-		return nil
-	}
+func (ec *eventChannel) Subscribe(ctx context.Context, channel chan []byte) {
+	ec.subscribe <- channel
+}
 
-	select {
-	case <-time.After(r.publisTimeout):
-		r.log.Warn("bus channel publish timeout", "channelName", channelName)
-		return errors.New("bus channel publish timeout")
-	case <-ctx.Done():
-	case channel <- data:
-	}
-	r.channelsLock.RUnlock()
-
+func (ec *eventChannel) Publish(ctx context.Context, data []byte) error {
+	ec.publish <- data
 	return nil
 }
 
-func (r *channelConnector) Subscribe(ctx context.Context, channelName string) <-chan []byte {
-	r.channelsLock.Lock()
-	defer r.channelsLock.Unlock()
-
-	channel, ok := r.channels[channelName]
-	if !ok {
-		channel := make(chan []byte)
-		r.channels[channelName] = channel
-		go func() {
-			select {
-			case <-ctx.Done():
-				r.channelsLock.Lock()
-				defer r.channelsLock.Unlock()
-				ch := r.channels[channelName]
-				delete(r.channels, channelName)
-				close(ch)
-			}
-		}()
-	}
-
-	return channel
+func (ec *eventChannel) Len() int {
+	ec.lock.RLock()
+	defer ec.lock.RUnlock()
+	return len(ec.channels)
 }

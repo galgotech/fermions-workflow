@@ -13,6 +13,7 @@ import (
 )
 
 func New(spec model.Event, busEvent bus.Bus) environment.Event {
+	spec.DataOnly = true
 	return &Event{
 		log:      log.New("event"),
 		spec:     spec,
@@ -40,15 +41,20 @@ func (e *Event) Consume(ctx context.Context) (cloudevents.Event, error) {
 	return event.Event, nil
 }
 
-func (e *Event) Produce(ctx context.Context, event cloudevents.Event) error {
+func (e *Event) Produce(ctx context.Context, data model.Object) error {
 	if e.spec.Kind != model.EventKindProduced {
 		return errors.New("event is not 'produce'")
 	}
 
 	e.log.Debug("produce", "source", e.spec.Source, "name", e.spec.Name, "type", e.spec.Type)
+	event := cloudevents.NewEvent()
 	event.SetType(e.spec.Type)
 	event.SetSource(e.spec.Source)
-	e.busEvent.Publish(ctx, event)
+	err := event.SetData(cloudevents.ApplicationJSON, model.ToInterface(data))
+	if err != nil {
+		return err
+	}
 
+	e.busEvent.Publish(ctx, event)
 	return nil
 }

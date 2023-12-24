@@ -53,20 +53,23 @@ func (e *EventRef) Run(ctx context.Context, dataIn model.Object) (model.Object, 
 }
 
 func (e *EventRef) consumeEvents(ctx context.Context, dataIn model.Object) (model.Object, error) {
-	ctxSubscribe, cancelSubscribe := context.WithCancel(ctx)
-	defer cancelSubscribe()
-
 	eventRefs := make([]<-chan eventRefOut, len(e.events))
 	for i, event := range e.events {
-		eventRefs[i] = e.runEventRef(ctxSubscribe, event)
+		eventRefs[i] = e.runEventRef(ctx, event)
 	}
 
+	dataOut := data.ObjectNil
+	var err error
 	if e.exclusive {
 		eventRef := <-concurrency.Or(eventRefs...)
 		if eventRef.Err != nil {
 			return data.ObjectNil, eventRef.Err
 		}
-		data.Merge(dataIn, eventRef.Data)
+
+		dataOut, err = data.Merge(dataIn, eventRef.Data)
+		if err != nil {
+			return data.ObjectNil, nil
+		}
 
 	} else {
 		for _, ch := range eventRefs {
@@ -74,11 +77,14 @@ func (e *EventRef) consumeEvents(ctx context.Context, dataIn model.Object) (mode
 			if eventRef.Err != nil {
 				return data.ObjectNil, eventRef.Err
 			}
-			data.Merge(data.ObjectNil, eventRef.Data)
+			dataOut, err = data.Merge(data.ObjectNil, eventRef.Data)
+			if err != nil {
+				return data.ObjectNil, nil
+			}
 		}
 	}
 
-	return dataIn, nil
+	return dataOut, nil
 }
 
 func (e *EventRef) runEventRef(ctx context.Context, event environment.Event) <-chan eventRefOut {

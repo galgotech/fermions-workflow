@@ -29,7 +29,7 @@ type Function interface {
 }
 
 type Event interface {
-	Produce(ctx context.Context, event cloudevents.Event) error
+	Produce(ctx context.Context, data model.Object) error
 	Consume(ctx context.Context) (cloudevents.Event, error)
 }
 

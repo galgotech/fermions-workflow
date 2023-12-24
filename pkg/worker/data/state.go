@@ -11,31 +11,39 @@ var ErrStateNotFound = errors.New("state not found")
 
 func Provide() Manager {
 	return &WorkflowManager{
-		log:    log.New("worker-runtime-process"),
-		states: make(map[string]model.Object, 0),
+		log:   log.New("worker-runtime-process"),
+		state: model.FromMap(map[string]any{}),
 	}
 }
 
 type Manager interface {
-	State(name string) model.Object
-	SetState(name string, state model.Object)
+	Get() model.Object
+	Set(state model.Object) error
 }
 
 type WorkflowManager struct {
-	log    log.Logger
-	states map[string]model.Object
+	log   log.Logger
+	state model.Object
 }
 
-func (m *WorkflowManager) State(name string) model.Object {
-	if val, ok := m.states[name]; ok {
-		return val
+func (m *WorkflowManager) Get() model.Object {
+	return m.state
+}
+
+func (m *WorkflowManager) Set(state model.Object) error {
+	if state.Type != model.Map {
+		return errors.New("state set require type model.Map")
 	}
 
-	s := model.Object{}
-	m.states[name] = s
-	return s
-}
+	if len(m.state.MapValue) == 0 {
+		m.state = state
+		return nil
+	}
 
-func (m *WorkflowManager) SetState(name string, state model.Object) {
-	m.states[name] = state
+	state, err := Merge(m.state, state)
+	if err != nil {
+		return err
+	}
+	m.state = state
+	return nil
 }

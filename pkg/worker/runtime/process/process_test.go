@@ -25,10 +25,10 @@ func TestStart(t *testing.T) {
 
 		assert.Equal(t, 2, env.CountCompensateBy)
 		assert.Equal(t, 2, env.CountProduceEvents)
-		dataState := dataManager.State("test0")
-		assert.Equal(t, data.Data[interface{}]{"test": "test0"}, dataState)
-		dataState = dataManager.State("test1")
-		assert.Equal(t, data.Data[interface{}]{"test": "test1"}, dataState)
+		dataState := dataManager.Get()
+		assert.Equal(t, model.FromMap(map[string]any{"test": "test0"}), dataState)
+		dataState = dataManager.Get()
+		assert.Equal(t, model.FromMap(map[string]any{"test": "test1"}), dataState)
 	})
 }
 

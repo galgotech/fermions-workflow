@@ -15,7 +15,10 @@ import (
 
 func TestExecute(t *testing.T) {
 	t.Run("execute", func(t *testing.T) {
-		worker, fr := setup(test.Workflow)
+		workflowBuilder := model.NewWorkflowBuilder()
+		workflow := workflowBuilder.Build()
+
+		worker, fr := setup(workflow)
 		worker.Execute()
 		assert.Equal(t, 1, fr.Env.(*environmentStub).Count)
 		assert.Equal(t, 1, fr.Count)

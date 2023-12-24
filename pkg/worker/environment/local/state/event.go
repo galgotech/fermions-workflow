@@ -20,7 +20,7 @@ func newEvent(spec model.EventState, stateBase StateImpl, functions environment.
 		}
 
 		// Actions
-		actions, err := newAction(specEventRef.Actions, functions)
+		actions, err := newAction(specEventRef.Actions, functions, mapEvents)
 		if err != nil {
 			return nil, err
 		}
@@ -63,7 +63,7 @@ func (e *Event) Run(ctx context.Context, dataIn model.Object) (model.Object, err
 	}
 
 	dataOut := eventOut.Data
-	return dataOut, nil
+	return dataOut, eventOut.Err
 }
 
 func (e *Event) runEvent(ctx context.Context, onEvent EventRef, dataIn model.Object) <-chan eventOut {

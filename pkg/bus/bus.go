@@ -2,18 +2,24 @@ package bus
 
 import (
 	"context"
-	"time"
+	"errors"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 
-	"github.com/galgotech/fermions-workflow/pkg/concurrency"
 	"github.com/galgotech/fermions-workflow/pkg/log"
 	"github.com/galgotech/fermions-workflow/pkg/setting"
 )
 
 type Connector interface {
-	Publish(ctx context.Context, name string, data []byte) error
-	Subscribe(ctx context.Context, channelName string) <-chan []byte
+	Publish(ctx context.Context, data []byte) error
+	Subscribe(ctx context.Context, channel chan []byte)
+	Len() int
+}
+
+type BusEvent struct {
+	Event cloudevents.Event
+	Raw   []byte
+	Err   error
 }
 
 type Bus interface {
@@ -22,9 +28,8 @@ type Bus interface {
 }
 
 func Provide(s setting.Setting) (Bus, error) {
-	log := log.New("bus")
 	bus := &BusImpl{
-		log:     log,
+		log:     log.New("bus"),
 		setting: s,
 	}
 
@@ -39,7 +44,7 @@ func Provide(s setting.Setting) (Bus, error) {
 type BusImpl struct {
 	setting     setting.Setting
 	log         log.Logger
-	connector   *broadcastConnector
+	connector   *pubSub
 	initialized bool
 }
 
@@ -49,19 +54,19 @@ func (b *BusImpl) init() (err error) {
 	}
 	b.initialized = true
 
-	var connector Connector
+	var connector FuncNewEvent
 	// TODO Add suport to https://nats.io/
 	if b.setting.Bus().Redis != "" {
 		b.log.Debug("redis url", "url", b.setting.Bus().Redis)
-		connector, err = NewRedis(b.setting.Bus().Redis)
+		connector, err = NewEventRedis(b.setting.Bus().Redis)
 		if err != nil {
 			return err
 		}
 	} else {
-		connector = NewChannel()
+		connector = NewEventChannel
 	}
 
-	b.connector = NewBroadcast(connector)
+	b.connector = NewPubSub(connector)
 	return nil
 }
 
@@ -82,10 +87,12 @@ func (b *BusImpl) Subscribe(ctx context.Context, channel string) <-chan BusEvent
 	subscribe := make(chan BusEvent)
 	go func() {
 		defer close(subscribe)
-		for data := range concurrency.OrDoneCtx(ctx, receive.Channel()) {
-			busEvent := BusEvent{
-				Raw: data,
-			}
+		data, ok := <-receive
+		busEvent := BusEvent{
+			Raw: data,
+		}
+
+		if ok {
 			event := cloudevents.NewEvent()
 			err := event.UnmarshalJSON(data)
 			if err != nil {
@@ -93,60 +100,11 @@ func (b *BusImpl) Subscribe(ctx context.Context, channel string) <-chan BusEvent
 			} else {
 				busEvent.Event = event
 			}
-			subscribe <- busEvent
+		} else {
+			busEvent.Err = errors.New("channel closed")
 		}
+		subscribe <- busEvent
 	}()
 
 	return subscribe
-}
-
-type BusEvent struct {
-	Event cloudevents.Event
-	Raw   []byte
-	Err   error
-}
-
-type startGoroutineFn func(done <-chan interface{}, puselInterval time.Duration) (heartbeat <-chan interface{})
-
-func newSteward(timeout time.Duration, startGoroutine startGoroutineFn) startGoroutineFn {
-	return func(done <-chan interface{}, puselInterval time.Duration) <-chan interface{} {
-		heartbeat := make(chan interface{})
-		go func() {
-			defer close(heartbeat)
-
-			var wardDone chan interface{}
-			var wardHeartbeat <-chan interface{}
-			startWard := func() {
-				wardDone = make(chan interface{})
-				wardHeartbeat = startGoroutine(concurrency.Or(wardDone, wardHeartbeat), timeout/2)
-			}
-			startWard()
-			pulse := time.Tick(puselInterval)
-
-		monitorLoop:
-			for {
-				timeoutSignal := time.After(timeout)
-
-				for {
-					select {
-					case <-pulse:
-						select {
-						case heartbeat <- struct{}{}:
-						default:
-						}
-					case <-wardHeartbeat:
-						continue monitorLoop
-					case <-timeoutSignal:
-						close(wardDone)
-						startWard()
-						continue monitorLoop
-					case <-done:
-						return
-					}
-				}
-			}
-		}()
-
-		return heartbeat
-	}
 }

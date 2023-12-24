@@ -2,7 +2,7 @@ module github.com/galgotech/fermions-workflow
 
 go 1.19
 
-replace github.com/serverlessworkflow/sdk-go/v2 => github.com/galgotech/sdk-go/v2 v2.0.0-20230901022336-3a8309c1e503
+replace github.com/serverlessworkflow/sdk-go/v2 => github.com/galgotech/sdk-go/v2 v2.0.0-20231224195238-3e159a753560
 
 require (
 	cuelang.org/go v0.5.0
@@ -18,10 +18,11 @@ require (
 	github.com/itchyny/gojq v0.12.13
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/rs/zerolog v1.29.1
-	github.com/serverlessworkflow/sdk-go/v2 v2.2.4
+	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
+	github.com/serverlessworkflow/sdk-go/v2 v2.2.5
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.7
-	golang.org/x/net v0.11.0
+	golang.org/x/net v0.18.0
 	gopkg.in/ini.v1 v1.67.0
 )
 
@@ -79,10 +80,10 @@ require (
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/redis/rueidis v1.0.8-go1.18 // indirect
+	github.com/relvacode/iso8601 v1.3.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/segmentio/encoding v0.3.6 // indirect
-	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
@@ -92,10 +93,10 @@ require (
 	go.uber.org/multierr v1.1.0 // indirect
 	go.uber.org/zap v1.10.0 // indirect
 	golang.org/x/arch v0.3.0 // indirect
-	golang.org/x/crypto v0.10.0 // indirect
+	golang.org/x/crypto v0.15.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/sys v0.9.0 // indirect
-	golang.org/x/text v0.10.0 // indirect
+	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

@@ -3,56 +3,56 @@ package state
 import (
 	"testing"
 
-	"github.com/galgotech/fermions-workflow/pkg/test"
-	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
 	"github.com/serverlessworkflow/sdk-go/v2/model"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/galgotech/fermions-workflow/pkg/test"
 )
 
-type functionStub struct {
-	environment.Function
-}
-
-func (f *functionStub) Run(dataIn model.Object) (model.Object, error) {
-	dataOut := model.FromInterface(map[string]any{"test": "test"})
-	return dataOut, nil
-}
-
 func Test_newAction(t *testing.T) {
+	builder := model.NewActionBuilder()
+	builder.Name("action1")
+	functionRef := builder.FunctionRef()
+	functionRef.RefName("test0")
 
-	t.Run("prepare transition", func(t *testing.T) {
-		mapFunctions := environment.MapFunctions{
-			"test": &functionStub{},
-		}
-
-		a, err := newAction([]model.Action{test.Action1}, mapFunctions)
-		assert.NoError(t, err)
-		assert.NotNil(t, a)
-	})
-
-	t.Run("run", func(t *testing.T) {
-		mapFunctions := environment.MapFunctions{
-			"test": &functionStub{},
-		}
-		a, err := newAction([]model.Action{test.Action1}, mapFunctions)
-		assert.NoError(t, err)
-
-		dataOut, err := a.Run(model.Object{})
-		assert.Nil(t, err)
-		assert.Equal(t, model.FromInterface(map[string]any{"test": "test"}), dataOut)
-	})
+	actions, err := newAction([]model.Action{builder.Build()}, test.MapFunctions, test.MapEvents)
+	assert.NoError(t, err)
+	assert.NotNil(t, actions)
 }
 
 func TestRunAction(t *testing.T) {
-	t.Run("exec", func(t *testing.T) {
-		mapFunctions := environment.MapFunctions{
-			"test": &functionStub{},
-		}
+	t.Run("useResults = true", func(t *testing.T) {
+		actionBuilder1 := model.NewActionBuilder().Name("action1")
+		actionBuilder1.FunctionRef().RefName("test0")
+		actionBuilder2 := model.NewActionBuilder().Name("action2")
+		actionBuilder2.FunctionRef().RefName("test1")
 
-		a, err := newAction([]model.Action{test.Action1}, mapFunctions)
+		actions, err := newAction([]model.Action{
+			actionBuilder1.Build(),
+			actionBuilder2.Build(),
+		}, test.MapFunctions, test.MapEvents)
 		assert.NoError(t, err)
-		dataOut, err := a.Run(model.Object{})
+
+		dataOut, err := actions.Run(model.FromMap(map[string]any{"input": "input_value"}))
 		assert.NoError(t, err)
-		assert.Equal(t, model.FromInterface(map[string]any{"test": "test"}), dataOut)
+		assert.Equal(t, model.FromInterface(map[string]any{"input": "input_value", "out0": "value_out0", "out1": "value_out1"}), dataOut)
+	})
+
+	t.Run("useResults = false", func(t *testing.T) {
+		actionBuilder1 := model.NewActionBuilder().Name("action1")
+		actionBuilder1.FunctionRef().RefName("test0")
+		actionBuilder2 := model.NewActionBuilder().Name("action2")
+		actionBuilder2.FunctionRef().RefName("test1")
+		actionBuilder2.ActionDataFilter().UseResults(true)
+
+		actions, err := newAction([]model.Action{
+			actionBuilder1.Build(),
+			actionBuilder2.Build(),
+		}, test.MapFunctions, test.MapEvents)
+		if assert.NoError(t, err) {
+			dataOut, err := actions.Run(model.FromMap(map[string]any{"input": "input_value"}))
+			assert.NoError(t, err)
+			assert.Equal(t, model.FromMap(map[string]any{"input": "input_value", "out2": "value_out2"}), dataOut)
+		}
 	})
 }

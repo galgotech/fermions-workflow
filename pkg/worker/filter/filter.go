@@ -1,7 +1,6 @@
 package filter
 
 import (
-	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	"github.com/itchyny/gojq"
 	"github.com/serverlessworkflow/sdk-go/v2/model"
 )
@@ -30,13 +29,13 @@ type WorkflowFilter struct {
 }
 
 func (f *WorkflowFilter) Run(dataIn model.Object) (model.Object, error) {
-	iter := f.query.Run(data.ToInterface(dataIn))
+	iter := f.query.Run(model.ToInterface(dataIn))
 	v, ok := iter.Next()
 	if !ok {
 		return dataIn, nil
 	}
 
-	dataOut := data.FromInterface(v)
+	dataOut := model.FromInterface(v)
 	return dataOut, nil
 }
 

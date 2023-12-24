@@ -1,6 +1,8 @@
 package state
 
 import (
+	"time"
+
 	"github.com/serverlessworkflow/sdk-go/v2/model"
 
 	"github.com/galgotech/fermions-workflow/pkg/worker/data"
@@ -8,7 +10,7 @@ import (
 	"github.com/galgotech/fermions-workflow/pkg/worker/filter"
 )
 
-func newAction(specs []model.Action, functions environment.MapFunctions) (Actions, error) {
+func newAction(specs []model.Action, functions environment.MapFunctions, events environment.MapEvents) (Actions, error) {
 	actions := make(Actions, len(specs))
 	for i, spec := range specs {
 		filterFromStateData, filterResults, filterToStateData, err := initializeActionDataFilter(spec.ActionDataFilter)
@@ -16,8 +18,26 @@ func newAction(specs []model.Action, functions environment.MapFunctions) (Action
 			return nil, err
 		}
 
+		var sleepBefore time.Duration
+		var sleepAfter time.Duration
+		if spec.Sleep != nil {
+			sleepBefore, err = calcTimeDuration(spec.Sleep.Before)
+			if err != nil {
+				return nil, err
+			}
+
+			sleepAfter, err = calcTimeDuration(spec.Sleep.After)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		actions[i] = &Action{
-			Function:            functions[spec.FunctionRef.RefName],
+			spec:     spec,
+			Function: functions[spec.FunctionRef.RefName],
+			// Event:               events[spec.EventRef],
+			sleepBefore:         sleepBefore,
+			sleepAfter:          sleepAfter,
 			filterFromStateData: filterFromStateData,
 			filterResults:       filterResults,
 			filterToStateData:   filterToStateData,
@@ -28,49 +48,72 @@ func newAction(specs []model.Action, functions environment.MapFunctions) (Action
 }
 
 type Action struct {
-	Function environment.Function
-	// Workflow expression that filters state data that can be used by the action
+	spec                model.Action
+	Function            environment.Function
+	Event               environment.Event
+	sleepBefore         time.Duration
+	sleepAfter          time.Duration
 	filterFromStateData filter.Filter
-	// Workflow expression that filters the actions data results
-	filterResults filter.Filter
-	// Workflow expression that selects a state data element to which the action results should be added/merged into. If not specified denotes the top-level state data element
-	filterToStateData filter.Filter
+	filterResults       filter.Filter
+	filterToStateData   filter.Filter
 }
 
-func (a *Action) Run(dataIn model.Object) (dataOut model.Object, err error) {
-	dataIn, err = a.filterFromStateData.Run(dataIn)
+func (a *Action) Run(dataIn model.Object) (model.Object, error) {
+	// Workflow expression that filters state data that can be used by the action
+	dataIn, err := a.filterFromStateData.Run(dataIn)
 	if err != nil {
-		return
+		return data.ObjectNil, err
 	}
 
-	dataOut, err = a.Function.Run(dataIn)
-	if err != nil {
-		return
+	// Defines time periods workflow execution should sleep before function execution
+	if a.sleepBefore.Nanoseconds() > 0 {
+		time.Sleep(a.sleepBefore)
 	}
 
-	dataOut, err = a.filterResults.Run(dataOut)
+	dataOut, err := a.Function.Run(dataIn)
 	if err != nil {
-		return
+		return data.ObjectNil, err
 	}
 
-	dataOut, err = a.filterToStateData.Run(dataOut)
-	if err != nil {
-		return
+	// Defines time periods workflow execution should sleep after function execution
+	if a.sleepAfter.Nanoseconds() > 0 {
+		time.Sleep(a.sleepAfter)
 	}
 
-	return
+	// If set to false, action data results are not added/merged to state data.
+	if a.spec.ActionDataFilter.UseResults {
+		// Workflow expression that filters the actions data results
+		dataOut, err = a.filterResults.Run(dataOut)
+		if err != nil {
+			return data.ObjectNil, err
+		}
+
+		// Workflow expression that selects a state data element to which the action results should be added/merged into. If not specified denotes the top-level state data element
+		dataOut, err = a.filterToStateData.Run(dataOut)
+		if err != nil {
+			return data.ObjectNil, err
+		}
+		return dataOut, nil
+	}
+
+	return data.ObjectNil, nil
 }
 
 type Actions []*Action
 
-func (a Actions) Run(dataIn model.Object) (dataOut model.Object, err error) {
+func (a Actions) Run(dataIn model.Object) (model.Object, error) {
+	// dataMerge := model.FromMap(map[string]any{})
 	for _, action := range a {
-		dataOut, err = action.Run(dataIn)
+		dataOut, err := action.Run(dataIn)
 		if err != nil {
 			return data.ObjectNil, err
 		}
-		dataIn = dataOut
+
+		dataIn, err = data.Merge(dataIn, dataOut)
+		if err != nil {
+			return data.ObjectNil, err
+		}
 	}
 
-	return
+	return dataIn, nil
 }

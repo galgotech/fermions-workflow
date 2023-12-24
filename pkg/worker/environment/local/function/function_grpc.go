@@ -1,17 +1,19 @@
 package function
 
-import "github.com/galgotech/fermions-workflow/pkg/worker/data"
+import (
+	"github.com/serverlessworkflow/sdk-go/v2/model"
+)
 
 type FunctionGrpc struct {
 	Operation string
 }
 
-func (w *FunctionGrpc) Init(data data.Data[any]) error {
+func (w *FunctionGrpc) Init(data model.Object) error {
 	return nil
 }
 
-func (w *FunctionGrpc) Run(data data.Data[any]) (data.Data[any], error) {
-	return nil, nil
+func (w *FunctionGrpc) Run(data model.Object) (model.Object, error) {
+	return model.FromNull(), nil
 }
 
 func NewFunctionGrpc(operation string) *FunctionGrpc {

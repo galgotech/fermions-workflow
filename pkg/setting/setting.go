@@ -1,7 +1,6 @@
 package setting
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -75,7 +74,7 @@ func (s *FermionsSetting) ParseWorkflow(filePath string) error {
 
 	paths := []string{}
 	if info.IsDir() {
-		files, err := ioutil.ReadDir(filePath)
+		files, err := os.ReadDir(filePath)
 		if err != nil {
 			return err
 		}

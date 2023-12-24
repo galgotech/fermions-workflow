@@ -6,6 +6,7 @@ import (
 	"github.com/serverlessworkflow/sdk-go/v2/model"
 
 	"github.com/galgotech/fermions-workflow/pkg/worker/environment"
+	"github.com/galgotech/fermions-workflow/pkg/worker/filter"
 )
 
 func newCallback(spec model.CallbackState, baseState StateImpl, functions environment.MapFunctions, mapEvents environment.MapEvents) (environment.State, error) {
@@ -13,15 +14,19 @@ func newCallback(spec model.CallbackState, baseState StateImpl, functions enviro
 	event := []environment.Event{mapEvents[spec.EventRef]}
 
 	// Actions
-	actions, err := newAction([]model.Action{spec.Action}, functions)
+	actions, err := newAction([]model.Action{spec.Action}, functions, mapEvents)
 	if err != nil {
 		return nil, err
 	}
 
 	// Filters
-	filterData, filterToStateData, err := initializeEventDataFilter(*spec.EventDataFilter)
-	if err != nil {
-		return nil, err
+	var filterData filter.Filter
+	var filterToStateData filter.Filter
+	if spec.EventDataFilter != nil {
+		filterData, filterToStateData, err = initializeEventDataFilter(*spec.EventDataFilter)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	eventRef, err := newEventRef(event, actions, filterData, filterToStateData, true)

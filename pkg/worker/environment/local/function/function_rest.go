@@ -61,7 +61,7 @@ func (w *FunctionRest) Run(dataIn model.Object) (model.Object, error) {
 		return data.ObjectNil, errors.New("operation not initialized")
 	}
 
-	dataMapIn := data.ToInterface(dataIn).(map[string]any)
+	dataMapIn := model.ToInterface(dataIn).(map[string]any)
 	url := *w.url
 	for _, parameter := range w.op.Parameters {
 		value, ok := dataMapIn[parameter.Name].(string)

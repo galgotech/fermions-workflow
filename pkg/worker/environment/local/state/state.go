@@ -18,7 +18,7 @@ func New(spec model.State, mapFunctions environment.MapFunctions, mapEvents envi
 	case model.StateTypeEvent:
 		return newEvent(*spec.EventState, stateBase, mapFunctions, mapEvents)
 	case model.StateTypeOperation:
-		return newOperation(*spec.OperationState, stateBase, mapFunctions)
+		return newOperation(*spec.OperationState, stateBase, mapFunctions, mapEvents)
 	case model.StateTypeSwitch:
 		return newSwitch(*spec.SwitchState, stateBase)
 	case model.StateTypeInject:

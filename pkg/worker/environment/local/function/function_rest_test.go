@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/galgotech/fermions-workflow/pkg/worker/data"
 	"github.com/serverlessworkflow/sdk-go/v2/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -99,6 +98,6 @@ func TestRest(t *testing.T) {
 
 		dataOut, err := functionRest.Run(model.Object{})
 		assert.Nil(t, err)
-		assert.Equal(t, data.Data[any]{"test": "test"}, dataOut)
+		assert.Equal(t, model.FromMap(map[string]any{"test": "test"}), dataOut)
 	})
 }

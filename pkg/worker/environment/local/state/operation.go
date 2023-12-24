@@ -9,8 +9,8 @@ import (
 	"github.com/galgotech/fermions-workflow/pkg/worker/filter"
 )
 
-func newOperation(spec model.OperationState, baseState StateImpl, functions environment.MapFunctions) (*Operation, error) {
-	actions, err := newAction(spec.Actions, functions)
+func newOperation(spec model.OperationState, baseState StateImpl, functions environment.MapFunctions, mapEvents environment.MapEvents) (*Operation, error) {
+	actions, err := newAction(spec.Actions, functions, mapEvents)
 	if err != nil {
 		return nil, err
 	}

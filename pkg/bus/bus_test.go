@@ -3,68 +3,55 @@ package bus
 import (
 	"sync"
 	"testing"
+	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 
-	"github.com/galgotech/fermions-workflow/pkg/log"
+	"github.com/galgotech/fermions-workflow/pkg/setting"
 )
 
+type stubSetting struct {
+	setting.Setting
+}
+
+func (s *stubSetting) Bus() setting.Bus {
+	return setting.Bus{
+		Redis: "",
+	}
+}
+
 func TestSubscribe(t *testing.T) {
-	connector := &stubConnector{
-		channel: make(chan []byte),
-	}
-	b := BusImpl{
-		connector: NewBroadcast(connector),
-	}
+	b, err := Provide(&stubSetting{})
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+	subscribe := b.Subscribe(ctx, "test1")
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		select {
+		case <-time.After(1 * time.Second):
+			assert.Fail(t, "timeout")
+		case event := <-subscribe:
+			assert.NoError(t, event.Err)
+			d, err := event.Event.MarshalJSON()
+			assert.NoError(t, err)
+			assert.Equal(t, `{"specversion":"1.0","id":"","source":"test1","type":"type","datacontenttype":"application/json","data":{"test":"test"}}`, string(d))
+		}
+	}()
 
 	event := cloudevents.NewEvent()
 	event.SetType("type")
 	event.SetSource("test1")
-	event.UnmarshalJSON([]byte(`{}`))
+	err = event.SetData(cloudevents.ApplicationJSON, map[string]any{"test": "test"})
+	assert.NoError(t, err)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func(t *testing.T) {
-		defer wg.Done()
-		ctx := context.Background()
-		subscribe := b.Subscribe(ctx, "test")
-		event := <-subscribe
-		assert.NoError(t, event.Err)
-
-		d, err := event.Event.MarshalJSON()
-		assert.NoError(t, err)
-		assert.Equal(t, `{"specversion":"1.0","id":"","source":"test1","type":"type"}`, string(d))
-	}(t)
-
-	ctx := context.Background()
 	b.Publish(ctx, event)
 	b.Publish(ctx, event)
-	assert.Equal(t, 3, connector.SubscribeCount)
-	assert.Equal(t, 2, connector.PublishCount)
 
 	wg.Wait()
-}
-
-type stubConnector struct {
-	Connector
-	log            log.Logger
-	PublishCount   int
-	SubscribeCount int
-
-	channel chan []byte
-}
-
-func (c *stubConnector) Publish(ctx context.Context, channelName string, data []byte) error {
-	c.log.Debug("publish", "channelName", channelName)
-
-	c.PublishCount++
-	c.channel <- data
-	return nil
-}
-
-func (c *stubConnector) Subscribe(ctx context.Context, channelName string) <-chan []byte {
-	c.SubscribeCount = 1
-	return c.channel
 }
